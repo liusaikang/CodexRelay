@@ -1,0 +1,14 @@
+**
+!package.json
+!package-lock.json
+!tsconfig.json
+!src/
+!src/**
+!public/
+!public/**
+!config/
+!config/docker.yaml
+!examples/
+!examples/workspace/
+!examples/workspace/**
+!Dockerfile

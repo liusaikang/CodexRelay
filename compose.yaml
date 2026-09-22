@@ -1,0 +1,29 @@
+services:
+  codex-mcp:
+    build: .
+    image: codex-task-mcp:local
+    init: true
+    # A stale instance lock needs inspection after an unclean shutdown.
+    restart: "no"
+    ports:
+      - "127.0.0.1:${CODEX_MCP_PORT:-8787}:8787"
+    environment:
+      CODEX_MCP_TOKEN: ${CODEX_MCP_TOKEN:?Run npm run init:env first}
+      CODEX_API_KEY: ${CODEX_API_KEY:-}
+      CODEX_MODEL: ${CODEX_MODEL:-}
+      CODEX_MODEL_REASONING_EFFORT: ${CODEX_MODEL_REASONING_EFFORT:-}
+    volumes:
+      - codex-state:/data
+      # Mount the project workspace and set codex.defaultWorkingDirectory to /workspace.
+      # - ./workspace:/workspace
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=256m
+    pids_limit: 256
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+volumes:
+  codex-state:

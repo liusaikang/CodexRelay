@@ -1,0 +1,14 @@
+# Offline transport/scheduler demo; no model call and no real analysis.
+dataDir: ../data/native-demo
+server:
+  host: 127.0.0.1
+  port: 8787
+  localConsole: true
+tasks:
+  maxConcurrent: 3
+  maxQueued: 100
+  timeoutSeconds: 30
+runner: demo
+codex:
+  home: ../data/demo-codex-home
+  defaultWorkingDirectory: ../examples/workspace

@@ -1,0 +1,7 @@
+2026-09-21T09:30:00+08:00 ERROR module=orders requestId=sample-002 code=ORDER_LIST_FAILED user=demo-reader
+TypeError: Cannot read properties of null (reading 'tenantId')
+    at listOrders (src/orders.mjs:2:40)
+2026-09-21T09:32:00+08:00 ERROR module=orders requestId=sample-003 code=ORDER_LIST_FAILED user=demo-reader
+TypeError: Cannot read properties of null (reading 'tenantId')
+    at listOrders (src/orders.mjs:2:40)
+2026-09-21T09:40:00+08:00 ERROR module=metrics requestId=sample-004 code=OPTIONAL_METRICS_TIMEOUT attempts=1 recovered=true

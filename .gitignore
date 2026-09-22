@@ -1,0 +1,11 @@
+node_modules/
+dist/
+data/
+.env
+.env.*
+!.env.example
+config/*.local.yaml
+config/local.yaml
+coverage/
+*.log
+!examples/workspace/application.log

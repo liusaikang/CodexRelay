@@ -1,0 +1,7 @@
+2026-09-21T09:29:59+08:00 INFO module=orders requestId=sample-002 GET /orders user=demo-reader
+2026-09-21T09:29:59+08:00 INFO module=orders requestId=sample-002 lookupMembership result=null
+2026-09-21T09:30:00+08:00 INFO module=orders requestId=sample-002 status=500
+2026-09-21T09:31:59+08:00 INFO module=orders requestId=sample-003 GET /orders user=demo-reader
+2026-09-21T09:31:59+08:00 INFO module=orders requestId=sample-003 lookupMembership result=null
+2026-09-21T09:32:00+08:00 INFO module=orders requestId=sample-003 status=500
+2026-09-21T09:40:01+08:00 INFO module=metrics requestId=sample-004 retry=1 result=success affectedBusinessRequests=0

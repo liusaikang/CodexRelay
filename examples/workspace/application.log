@@ -1,0 +1,3 @@
+2026-09-21T08:00:00+08:00 INFO requestId=demo-001 user=sample-user tenant=tenant-a GET /orders
+2026-09-21T08:00:00+08:00 INFO requestId=demo-001 queryTenant=tenant-a visibleOrderCount=0
+2026-09-21T08:00:00+08:00 WARN requestId=demo-001 expectedOrder=sample-order belongsTo=tenant-b

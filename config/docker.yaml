@@ -1,0 +1,20 @@
+# Container paths. Rebuild the image after changing this bundled configuration.
+dataDir: /data/native-service
+server:
+  host: 0.0.0.0
+  port: 8787
+  tokenEnv: CODEX_MCP_TOKEN
+  localConsole: false
+  allowedHosts: [localhost, 127.0.0.1, '[::1]', codex-mcp]
+  allowedOrigins: []
+tasks:
+  maxConcurrent: 3
+  maxQueued: 100
+  timeoutSeconds: 600
+runner: codex
+codex:
+  home: /data/codex-home
+  defaultWorkingDirectory: ../examples/workspace
+  defaultModel: ${CODEX_MODEL:-}
+  defaultReasoningEffort: ${CODEX_MODEL_REASONING_EFFORT:-}
+  envAllowlist: [CODEX_API_KEY, HTTPS_PROXY, HTTP_PROXY, NO_PROXY]
