@@ -75,6 +75,10 @@ export function createHttpApp(service: TaskService, token: string, accountStatus
   app.post('/v1/tasks', async (req, res) => res.status(202).json(await service.submit(req.body)));
   app.get('/v1/tasks/:id', (req, res) => res.json(service.getTask(idSchema.parse(req.params.id))));
   app.post('/v1/tasks/:id/cancel', async (req, res) => res.json(await service.cancel(idSchema.parse(req.params.id))));
+  app.post('/v1/sessions/:id/resume', async (req, res) => {
+    const { blockedByTaskId } = z.object({ blockedByTaskId: idSchema }).strict().parse(req.body);
+    res.json(await service.resumeSession(idSchema.parse(req.params.id), blockedByTaskId));
+  });
   app.get('/v1/sessions', (req, res) => { const { offset, limit } = pagination(req.query); res.json(service.listSessions(offset, limit)); });
   app.get('/v1/sessions/:id', (req, res) => {
     const { offset, limit } = pagination(req.query);
@@ -91,7 +95,10 @@ export function createHttpApp(service: TaskService, token: string, accountStatus
   app.use((_req, res) => res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Endpoint not found' } }));
   const errors: ErrorRequestHandler = (error, _req, res, _next) => {
     if (res.headersSent) { res.end(); return; }
-    if (error instanceof AppError) { res.status(error.httpStatus).json({ error: { code: error.code, message: error.message } }); return; }
+    if (error instanceof AppError) {
+      if (error.httpStatus === 429) res.set('Retry-After', '5');
+      res.status(error.httpStatus).json({ error: { code: error.code, message: error.message } }); return;
+    }
     if (error instanceof ZodError || error.type === 'entity.parse.failed' || error.type === 'entity.too.large') {
       res.status(error.type === 'entity.too.large' ? 413 : 400).json({ error: { code: 'INVALID_INPUT', message: 'Invalid request. Check input types, lengths and required fields.' } }); return;
     }

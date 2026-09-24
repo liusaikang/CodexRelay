@@ -23,7 +23,7 @@ export function createMcpServer(service: TaskService, transport: 'mcp' | 'stdio'
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
   }, input => respond(() => service.submit(input, transport)));
   server.registerTool('codex_get_task', {
-    title: '查询分析任务', description: 'Get task status, last 100 progress events, Markdown result, usage and error code. Terminal statuses: succeeded, failed, cancelled, timed_out, interrupted. Poll every 2-5 seconds.',
+    title: '查询分析任务', description: 'Get task status, scheduling reason and blocking task, last 100 progress events, result, usage and error code. Terminal statuses: succeeded, failed, cancelled, timed_out, interrupted. QUEUE_EXPIRED means execution never started. previous_task_failed requires operator acknowledgement via the session resume HTTP endpoint or cancellation. Poll every 2-5 seconds.',
     inputSchema: { taskId: idSchema }, outputSchema, annotations: read,
   }, ({ taskId }) => respond(() => service.getTask(taskId)));
   server.registerTool('codex_cancel_task', {

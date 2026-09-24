@@ -14,11 +14,13 @@ const task = (n, sessionId = sid(1)) => ({ taskId: tid(n), sessionId, status: 's
 const rows = Array.from({ length: 25 }, (_, i) => task(i + 1));
 rows.push(task(26, sid(2)));
 rows[23] = { ...rows[23], status: 'failed', result: undefined, error: { code: 'CODEX_FAILED', message: '模型请求失败' } };
-rows[24] = { ...rows[24], status: 'queued', result: undefined, startedAt: undefined, finishedAt: undefined };
+rows[24] = { ...rows[24], status: 'queued', result: undefined, startedAt: undefined, finishedAt: undefined,
+  scheduling: { reason: 'previous_task_failed', blockedByTaskId: tid(24), queueExpiresAt: '2026-09-24T10:00:00.000Z' } };
 const sessions = [1, 2].map(n => ({ sessionId: sid(n), createdAt: '2026-09-24T00:00:00Z', workingDirectory: '/workspace/example' }));
 let failTask = false, delaySession = false, releaseSession;
 const errors = [];
 const submissions = [];
+const resumptions = [];
 try {
   const page = await browser.newPage();
   page.on('pageerror', error => errors.push(error.message));
@@ -31,12 +33,17 @@ try {
     assert.equal(route.request().headers().authorization, 'Bearer session-fixture-token');
     if (path === '/v1/admin/account') return json({ available: true, authenticated: false });
     if (path === '/v1/info') return json({ runner: 'codex', maxConcurrent: 3, maxQueued: 100, defaultWorkingDirectory: '/workspace/example' });
-    if (path === '/v1/health') return json({ ready: true, running: 1, queued: 1, runner: 'codex' });
+    if (path === '/v1/health') return json({ ready: true, running: 1, queued: 1, receiving: 2, blocked: 1, runner: 'codex' });
     if (path === '/v1/sessions') return json({ items: sessions, total: 2, offset: 0, limit: 6 });
     if (path === '/v1/tasks' && route.request().method() === 'POST') {
       const input = route.request().postDataJSON(); submissions.push(input);
       const accepted = { ...task(52,input.sessionId || sid(1)), request: input };
       rows.push(accepted); return route.fulfill({ status: 202, json: accepted });
+    }
+    if (path === `/v1/sessions/${sid(1)}/resume`) {
+      resumptions.push(route.request().postDataJSON());
+      rows[24].scheduling = { reason: 'capacity' };
+      return json({ sessionId: sid(1), resumed: 1 });
     }
     if (path.startsWith('/v1/sessions/')) {
       const id = path.split('/').at(-1), session = sessions.find(s => s.sessionId === id);
@@ -61,6 +68,16 @@ try {
   await expect(page.locator('#turns article').last()).toContainText('排队中');
   await expect(page.locator('#health-running')).toContainText('1');
   await expect(page.locator('#health-queued')).toContainText('1');
+  await expect(page.locator('#health-blocked')).toHaveText('1');
+  await expect(page.locator('#health-receiving')).toHaveText('2');
+  await expect(page.locator('#turns article').last()).toContainText('前序任务未成功，等待确认继续');
+  page.once('dialog', dialog => dialog.dismiss());
+  await page.getByRole('button', { name: '确认继续此会话', exact: true }).click();
+  assert.equal(resumptions.length, 0);
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: '确认继续此会话', exact: true }).click();
+  await expect(page.locator('#turns article').last()).toContainText('等待全局并发名额');
+  assert.deepEqual(resumptions, [{ blockedByTaskId: tid(24) }]);
   await expect(page.locator(`article[data-task-id="${tid(24)}"]`)).toContainText('CODEX_FAILED');
   await page.getByRole('button', { name: '加载更早记录', exact: true }).click();
   await expect(page.locator('#turns article')).toHaveCount(25);

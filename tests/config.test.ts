@@ -11,6 +11,7 @@ it('loads native Codex defaults without importing skill or prompt contents', asy
   expect(config).not.toHaveProperty('capabilities');
   expect(config).not.toHaveProperty('projects');
   expect(config.invocationLog).toMatchObject({ enabled: false, retentionDays: 30 });
+  expect(config.queueTimeoutSeconds).toBe(1800);
   expect(config.maxConcurrent).toBe(parse(await readFile('config/default.yaml', 'utf8')).tasks.maxConcurrent);
 });
 

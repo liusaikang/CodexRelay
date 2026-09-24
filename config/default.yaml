@@ -15,6 +15,8 @@ tasks:
   maxConcurrent: 10
   maxQueued: 100
   timeoutSeconds: 600
+  # Maximum waiting time, including turns blocked by a failed predecessor.
+  queueTimeoutSeconds: 1800
 runner: codex
 codex:
   home: ${CODEX_HOME:-../data/codex-home}

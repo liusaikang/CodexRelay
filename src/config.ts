@@ -22,6 +22,7 @@ const tasksSchema = z.object({
   maxConcurrent: z.number().int().min(1).max(64).default(10),
   maxQueued: z.number().int().min(0).max(10000).default(100),
   timeoutSeconds: z.number().int().min(1).max(86400).default(600),
+  queueTimeoutSeconds: z.number().int().min(1).max(604800).default(1800),
 }).strict();
 const codexSchema = z.object({
   home: z.string().default('../data/codex-home'),

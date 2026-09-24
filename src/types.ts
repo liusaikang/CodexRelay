@@ -27,6 +27,9 @@ export const taskSchema = z.object({
   version: z.union([z.literal(1), z.literal(2)]), taskId: idSchema, sessionId: idSchema,
   request: storedRequestSchema, requestHash: z.string(), configHash: z.string(),
   status: statusSchema, createdAt: z.string(), startedAt: z.string().optional(), finishedAt: z.string().optional(),
+  enqueueSequence: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
+  queueExpiresAt: z.string().datetime().optional(),
+  dependsOnTaskId: idSchema.optional(), dependencyApprovedAt: z.string().datetime().optional(),
   invocationTransport: z.enum(['http', 'mcp', 'stdio']).optional(),
   stopReason: z.enum(['cancelled', 'timed_out', 'interrupted']).optional(),
   error: z.object({ code: z.string(), message: z.string() }).optional(),
@@ -47,7 +50,7 @@ export interface RuntimeConfig {
   tokenEnv: string; localConsole?: boolean; allowedHosts: string[]; allowedOrigins: string[];
   maxConcurrent: number; maxQueued: number; runner: 'codex' | 'demo';
   envAllowlist: string[]; codexPath?: string;
-  timeoutSeconds: number; defaultWorkingDirectory: string;
+  timeoutSeconds: number; queueTimeoutSeconds?: number; defaultWorkingDirectory: string;
   defaultModel?: string; defaultReasoningEffort?: z.infer<typeof modelReasoningEffortSchema>;
 }
 export interface Execution {

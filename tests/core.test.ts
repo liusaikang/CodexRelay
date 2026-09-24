@@ -252,6 +252,8 @@ describe('durable task scheduling', () => {
     const firstComplete = complete;
     firstComplete();
     await until(() => service.getTask(a.taskId).status === 'cancelled');
+    expect(service.getTask(b.taskId)).toMatchObject({ status: 'queued', scheduling: { reason: 'previous_task_failed' } });
+    await service.resumeSession(a.sessionId, a.taskId);
     await until(() => service.getTask(b.taskId).status === 'running' && complete !== firstComplete);
     complete();
     await until(() => service.getTask(b.taskId).status === 'succeeded');

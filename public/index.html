@@ -64,7 +64,7 @@
       <div class="field"><label for="auth-source">认证来源</label><input id="auth-source" value="由服务环境变量 CODEX_MCP_TOKEN 自动提供" readonly></div>
       <button type="button" id="reconnect"><i data-lucide="plug-zap"></i>重新连接</button>
     </section>
-    <section class="ops-health" aria-label="服务调度状态"><span>运行中 <strong id="health-running">—</strong></span><span>排队中 <strong id="health-queued">—</strong></span><span id="health-capacity" class="muted">并发上限 — · 队列上限 —</span><span id="health-updated" class="muted">尚未读取</span><span id="health-error" class="error hidden" role="status"></span></section>
+    <section class="ops-health" aria-label="服务调度状态"><span>接收中 <strong id="health-receiving">—</strong></span><span>运行中 <strong id="health-running">—</strong></span><span>排队中 <strong id="health-queued">—</strong></span><span>待确认 <strong id="health-blocked">—</strong></span><span id="health-capacity" class="muted">并发上限 — · 队列上限 —</span><span id="health-updated" class="muted">尚未读取</span><span id="health-error" class="error hidden" role="status"></span></section>
     <div id="task-message" class="message hidden" role="alert"></div>
     <main class="task-shell">
       <aside class="task-sidebar">
@@ -121,6 +121,8 @@
     const turnRows = new Map();
     const terminal = item => !['queued','running'].includes(item.status);
     const labels = {queued:'排队中',running:'执行中',succeeded:'已完成',failed:'失败',cancelled:'已取消',timed_out:'已超时',interrupted:'已中断'};
+    const waitingLabels = {capacity:'等待全局并发名额',session_active:'等待同会话正在执行的任务',session_predecessor:'等待同会话前序任务',previous_task_failed:'前序任务未成功，等待确认继续',service_stopping:'服务正在停止',storage_unavailable:'存储异常，调度已停止',ready:'等待调度'};
+    const resumingSessions = new Set();
     const formatTime = value => value ? new Date(value).toLocaleString('zh-CN', {hour12:false}) : '—';
     function serviceStatus(label, state = '') { $('service-label').textContent = label; $('service-status').className = 'service-status' + (state ? ' ' + state : ''); }
     function message(id, value = '') { $(id).textContent = value; $(id).classList.toggle('hidden', !value); }
@@ -216,6 +218,25 @@
           }
           article.append(times);
           if (item.stopReason && !terminal(item)) article.append(element('p','turn-note',`已请求停止：${item.stopReason}，等待执行进程退出。`));
+          if (item.scheduling) {
+            const schedule = item.scheduling;
+            article.append(element('p','turn-note',`${waitingLabels[schedule.reason] || schedule.reason}${schedule.blockedByTaskId ? '\n前序任务：' + schedule.blockedByTaskId : ''}${schedule.queueExpiresAt ? '\n排队截止：' + formatTime(schedule.queueExpiresAt) : ''}`));
+            if (schedule.reason === 'previous_task_failed' && schedule.blockedByTaskId) {
+              const resume = element('button','','确认继续此会话'); resume.type = 'button'; resume.disabled = resumingSessions.has(item.sessionId);
+              resume.onclick = async () => {
+                if (resumingSessions.has(item.sessionId) || !confirm('前序任务未成功，继续执行可能缺少完整上下文。确认让此会话的后续任务继续排队？不会重新执行失败任务。')) return;
+                const epoch = viewEpoch;
+                resumingSessions.add(item.sessionId); resume.disabled = true;
+                try {
+                  await api('/v1/sessions/' + encodeURIComponent(item.sessionId) + '/resume',{method:'POST',body:JSON.stringify({blockedByTaskId:schedule.blockedByTaskId})});
+                  if (epoch === viewEpoch) { message('task-message'); await refreshConversation({force:true}); }
+                  await refreshHealth();
+                } catch (error) { if (epoch === viewEpoch) message('task-message','继续排队失败：' + error.message); }
+                finally { resumingSessions.delete(item.sessionId); if (epoch === viewEpoch) renderConversation(); }
+              };
+              article.append(resume);
+            }
+          }
           if (item.error) article.append(element('p','turn-note error',`${item.error.code}: ${item.error.message}`));
           const answer = item.result?.markdown;
           article.append(element('h4','','Codex 返回结果'));
@@ -309,10 +330,11 @@
       try {
         const health = await api('/v1/health');
         $('health-running').textContent = health.running; $('health-queued').textContent = health.queued;
+        $('health-receiving').textContent = health.receiving ?? '—'; $('health-blocked').textContent = health.blocked ?? '—';
         $('health-capacity').textContent = `并发上限 ${serviceInfo?.maxConcurrent ?? '—'} · 队列上限 ${serviceInfo?.maxQueued ?? '—'}`;
         $('health-updated').textContent = '检查于 ' + new Date().toLocaleTimeString('zh-CN',{hour12:false});
         message('health-error',health.ready ? '' : '服务当前未就绪');
-      } catch { $('health-running').textContent = '—'; $('health-queued').textContent = '—'; message('health-error','服务状态读取失败，当前调度情况未知'); }
+      } catch { for (const id of ['health-running','health-queued','health-receiving','health-blocked']) $(id).textContent = '—'; message('health-error','服务状态读取失败，当前调度情况未知'); }
     }
     function startMonitor() {
       clearTimeout(monitorTimer);

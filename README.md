@@ -64,6 +64,8 @@ npm run start:env
 
 服务信息入口为 `GET /v1/info` 和 `codex_get_service_info`，不是项目或 skill 清单。MCP 保持六个工具，完整字段见 [接口文档](docs/api.md)。
 
+调度采用有界接收、持久化队列、全局并发和同会话串行。支持排队过期、前序失败后的确认继续及异常锁检查，详见 [任务调度与恢复](docs/scheduling.md)。当前为单实例产品，不支持共享数据目录的多副本部署。
+
 ## 原生项目说明与 Skills
 
 示例工作目录约定：

@@ -49,6 +49,21 @@ it('runs the compiled stdio entry point through the official MCP transport', asy
   } finally { await client.close(); await rm(dir, { recursive: true, force: true }); }
 });
 
+it('inspects locks without authentication or state creation and refuses conflicting CLI modes', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'relay-lock-cli-'));
+  try {
+    const file = join(dir, 'config.yaml');
+    await writeFile(file, stringify({ dataDir: join(dir, 'state'), codex: { home: join(dir, 'home'), defaultWorkingDirectory: dir } }));
+    const args = [resolve('dist/main.js'), '--config', file];
+    const env = { ...process.env, CODEX_MCP_TOKEN: '' };
+    const result = await promisify(execFile)(process.execPath, [...args, '--inspect-lock'], { env });
+    expect(JSON.parse(result.stdout)).toEqual({ state: 'unlocked' });
+    await expect(access(join(dir, 'state'))).rejects.toMatchObject({ code: 'ENOENT' });
+    await expect(promisify(execFile)(process.execPath, [...args, '--recover-lock'], { env })).rejects.toMatchObject({ stderr: expect.stringContaining('Confirm that the old worker') });
+    await expect(promisify(execFile)(process.execPath, [...args, '--check', '--recover-lock', '--confirm-workers-stopped'], { env })).rejects.toMatchObject({ stderr: expect.stringContaining('Choose only one') });
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
 it('surfaces a genuine SDK CLI spawn failure through the compiled worker without hanging', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'codex-sdk-fail-'));
   try {

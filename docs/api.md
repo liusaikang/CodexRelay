@@ -65,6 +65,7 @@ stdio 依赖本机操作系统权限，日志写 stderr，stdout 留给协议。
 | POST | /v1/tasks | 提交任务，HTTP 202 |
 | GET | /v1/tasks/:taskId | 查询任务 |
 | POST | /v1/tasks/:taskId/cancel | 请求取消 |
+| POST | /v1/sessions/:sessionId/resume | 确认忽略指定失败前序，继续排队 |
 | GET | /v1/sessions?offset=0&limit=20 | 会话分页 |
 | GET | /v1/sessions/:sessionId?offset=0&limit=20 | 会话及任务摘要 |
 
@@ -95,6 +96,12 @@ Invoke-RestMethod "http://127.0.0.1:8787/v1/tasks/$($task.taskId)" -Headers $hea
   "idempotencyKey": "feedback-demo-001-followup"
 }
 ```
+
+## 排队与恢复
+
+规则与恢复操作见 [任务调度](scheduling.md)。过载返回 429（`ADMISSION_FULL` / `QUEUE_FULL`）；排队过期为终态 `timed_out`，错误码 `QUEUE_EXPIRED`。queued 任务包含 `scheduling.reason`、可选 `blockedByTaskId` 和截止时间。健康接口增加 `receiving`、`blocked`、`admissionLimit`；`blocked` 包含在 `queued` 中。
+
+恢复接口请求体为 `{ "blockedByTaskId": "task_<失败任务ID>" }`，同样要求 Bearer Token，只确认后续任务继续，不重跑旧任务，不延长排队期限。提交四参数及 MCP 六工具不变。
 
 ## 运维控制台会话排查
 

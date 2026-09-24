@@ -2,6 +2,7 @@ import { mkdir, open, readFile, readdir, rename, unlink } from 'node:fs/promises
 import { join } from 'node:path';
 import { hostname } from 'node:os';
 import { randomUUID } from 'node:crypto';
+import { z } from 'zod';
 import { AppError, idSchema, sessionSchema, taskSchema, type Session, type Store, type Task } from './types.js';
 
 export async function atomicJson(path: string, value: unknown) {
@@ -19,23 +20,74 @@ export async function atomicJson(path: string, value: unknown) {
   } finally { await unlink(temporary).catch(error => { if (error.code !== 'ENOENT') throw error; }); }
 }
 
+const ownerSchema = z.object({ pid: z.number().int().positive(), hostname: z.string().min(1), createdAt: z.string(), token: z.string().optional() });
+export async function inspectStoreLock(directory: string) {
+  let owner: z.infer<typeof ownerSchema>;
+  try { owner = ownerSchema.parse(JSON.parse(await readFile(join(directory, 'instance.lock'), 'utf8'))); }
+  catch (error) { return { state: (error as NodeJS.ErrnoException).code === 'ENOENT' ? 'unlocked' : 'unverifiable' }; }
+  if (owner.hostname !== hostname()) return { state: 'foreign', owner };
+  try { process.kill(owner.pid, 0); return { state: 'active', owner }; }
+  catch (error) { return { state: (error as NodeJS.ErrnoException).code === 'ESRCH' ? 'stale' : 'unverifiable', owner }; }
+}
+
+// Startup and explicit recovery share a short exclusive gate. Never auto-delete a stale gate.
+async function withStoreGate<T>(directory: string, operation: () => Promise<T>): Promise<T> {
+  const path = join(directory, 'instance.guard');
+  let gate;
+  try { gate = await open(path, 'wx', 0o600); }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new AppError('STORE_BUSY', 'Storage startup/recovery gate exists. Inspect its owner; do not remove it while maintenance is active.', 503);
+    throw error;
+  }
+  try {
+    await gate.writeFile(JSON.stringify({ pid: process.pid, hostname: hostname(), createdAt: new Date().toISOString() }));
+    await gate.sync();
+    return await operation();
+  } finally { await gate.close(); await unlink(path); }
+}
+
+export async function recoverStoreLock(directory: string, workersStopped: boolean) {
+  if (!workersStopped) throw new AppError('WORKER_CONFIRMATION_REQUIRED', 'Confirm that the old worker processes and descendants have stopped before recovery.', 409);
+  return withStoreGate(directory, async () => {
+    const inspection = await inspectStoreLock(directory);
+    if (inspection.state !== 'stale') throw new AppError('LOCK_RECOVERY_REFUSED', `Lock owner is ${inspection.state}; refusing recovery.`, 409);
+    const backupPath = join(directory, `instance.lock.recovered-${Date.now()}-${randomUUID()}.json`);
+    await atomicJson(backupPath, inspection.owner);
+    await unlink(join(directory, 'instance.lock'));
+    return { recovered: true, backupPath };
+  });
+}
+
 export class FileStore implements Store {
   private owned = false;
+  private ownerToken = randomUUID();
   constructor(private directory: string) {}
   async open() {
     await mkdir(this.directory, { recursive: true, mode: 0o700 });
-    let lock;
-    try { lock = await open(join(this.directory, 'instance.lock'), 'wx', 0o600); }
-    catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
-        throw new AppError('STORE_LOCKED', 'Data directory is locked. Stop the other instance; after a crash verify its PID is gone before removing instance.lock.', 503);
+    await withStoreGate(this.directory, async () => {
+      let lock;
+      try { lock = await open(join(this.directory, 'instance.lock'), 'wx', 0o600); }
+      catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+          const inspection = await inspectStoreLock(this.directory);
+          throw new AppError('STORE_LOCKED', `Data directory is locked (owner: ${inspection.state}). Use --inspect-lock; recovery is explicit and requires confirming old workers have stopped.`, 503);
+        }
+        throw error;
       }
-      throw error;
-    }
-    this.owned = true;
+      try {
+        try {
+          await lock.writeFile(JSON.stringify({ pid: process.pid, hostname: hostname(), createdAt: new Date().toISOString(), token: this.ownerToken }));
+          await lock.sync();
+        } finally { await lock.close(); }
+        this.owned = true;
+      } catch (error) {
+        // Still holding the gate: this is the file we exclusively created, not another owner's lock.
+        try { await unlink(join(this.directory, 'instance.lock')); }
+        catch (cleanupError) { throw new AggregateError([error, cleanupError], 'Lock initialization and cleanup failed; inspect storage before restart.'); }
+        throw error;
+      }
+    });
     try {
-      try { await lock.writeFile(JSON.stringify({ pid: process.pid, hostname: hostname(), createdAt: new Date().toISOString() })); await lock.sync(); }
-      finally { await lock.close(); }
       await mkdir(join(this.directory, 'tasks'), { recursive: true });
       await mkdir(join(this.directory, 'sessions'), { recursive: true });
       const read = async (folder: string) => {
@@ -56,6 +108,8 @@ export class FileStore implements Store {
   private assertOwned() { if (!this.owned) throw new Error('Store is not open'); }
   async close() {
     if (!this.owned) return;
+    const inspection = await inspectStoreLock(this.directory);
+    if (inspection.owner?.token !== this.ownerToken) throw new AppError('LOCK_OWNER_CHANGED', 'Storage lock ownership changed; refusing to remove it.', 503);
     await unlink(join(this.directory, 'instance.lock'));
     this.owned = false;
   }

@@ -19,6 +19,7 @@ tasks:
   maxConcurrent: 10
   maxQueued: 100
   timeoutSeconds: 600
+  queueTimeoutSeconds: 1800
 runner: codex
 codex:
   home: ${CODEX_HOME:-../data/codex-home}
@@ -31,6 +32,8 @@ codex:
 `runner` 只能选择 `codex` 或 `demo`。`codex.path` 可选，接受 CLI 可执行文件的绝对路径，也接受相对于 YAML 配置文件所在目录的路径，加载时通过 `resolve` 转为绝对路径；省略时使用 SDK 配套 CLI。Windows 指向真实可执行文件，不使用 `.ps1` 包装脚本。
 
 `maxConcurrent` 控制全局执行名额，`maxQueued` 控制额外等待任务数；`maxQueued: 0` 表示只接收可立即运行的任务。`timeoutSeconds` 是服务端执行超时，不是客户端轮询超时。同一会话即使有空闲名额也只能串行，模型账号额度仍可能限制实际吞吐量。
+
+`queueTimeoutSeconds` 控制等待期限，默认 1800 秒，范围 1 到 604800 秒。会话依赖等待、人工确认等待、停机时间均计入；修改配置不延长已接受任务的期限。接收阶段容量自动取 `maxConcurrent + maxQueued`，无需新增容量参数。详细状态与恢复策略见 [任务调度](scheduling.md)。
 
 `codex.home` 是专用持久化目录，保存认证、原生配置和线程状态。`CODEX_HOME` 通过上述占位符选择这个目录，不应直接使用开发者个人日常 home。`${VARIABLE}` 缺失时应报错；`${VARIABLE:-fallback}` 使用回退值。默认模型和推理强度展开为空表示未指定，由 Codex 采用原生默认值，不绑定某个模型名称。
 

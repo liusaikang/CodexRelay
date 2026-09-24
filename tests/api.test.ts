@@ -49,6 +49,19 @@ it('serves protected account status and supports a forced refresh', async () => 
   expect(refreshed.quota.primary.remainingPercent).toBe(59);
 });
 
+it('requires authentication and an explicit predecessor when resuming a blocked session', async () => {
+  const sessionId = 'sess_00000000-0000-4000-8000-000000000000';
+  const url = `${base}/v1/sessions/${sessionId}/resume`;
+  expect((await fetch(url, { method: 'POST' })).status).toBe(401);
+  expect((await fetch(url, { method: 'POST', headers, body: '{}' })).status).toBe(400);
+  let received: string[] = [];
+  service.resumeSession = async (session, blocker) => { received = [session, blocker]; return { sessionId: session, blockedByTaskId: blocker, resumed: 1 }; };
+  const blockedByTaskId = 'task_00000000-0000-4000-8000-000000000001';
+  const response = await fetch(url, { method: 'POST', headers, body: JSON.stringify({ blockedByTaskId }) });
+  expect(response.status).toBe(200);
+  expect(received).toEqual([sessionId, blockedByTaskId]);
+});
+
 it('protects invocation records and exposes filtered summaries without duplicating retries', async () => {
   expect((await fetch(`${base}/v1/admin/invocations`)).status).toBe(401);
   const request = { question: 'log-panel-test', context: { account: 'demo-user' }, idempotencyKey: 'log-test' };
