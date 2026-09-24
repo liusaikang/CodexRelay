@@ -7,6 +7,7 @@ import { createMcpServer } from './mcp.js';
 import { TaskService } from '../service.js';
 import { AppError, idSchema, pageSchema } from '../types.js';
 import type { AccountStatusProvider } from '../account.js';
+import { invocationQuerySchema } from '../invocations.js';
 
 export function createHttpApp(service: TaskService, token: string, accountStatus?: AccountStatusProvider) {
   if (token.length < 24) throw new Error('Service token must be at least 24 characters');
@@ -34,6 +35,9 @@ export function createHttpApp(service: TaskService, token: string, accountStatus
     if (req.method === 'GET' && req.path === '/assets/lucide.js') {
       res.sendFile(fileURLToPath(new URL('../../node_modules/lucide/dist/umd/lucide.js', import.meta.url))); return;
     }
+    if (req.method === 'GET' && req.path === '/assets/invocations.js') {
+      res.sendFile(fileURLToPath(new URL('../../public/invocations.js', import.meta.url))); return;
+    }
     if (req.method === 'GET' && req.path === '/favicon.ico') { res.status(204).end(); return; }
     if (req.path === '/healthz' && req.method === 'GET') {
       const ready = service.health().ready;
@@ -59,6 +63,9 @@ export function createHttpApp(service: TaskService, token: string, accountStatus
   };
   app.get('/v1/health', (_req, res) => res.json(service.health()));
   app.get('/v1/info', (_req, res) => res.json(service.info()));
+  app.get('/v1/admin/invocations/summary', (req, res) => res.json(service.invocations.summary(invocationQuerySchema.parse(req.query))));
+  app.get('/v1/admin/invocations', (req, res) => res.json(service.invocations.list(invocationQuerySchema.parse(req.query))));
+  app.get('/v1/admin/invocations/:id', (req, res) => res.json(service.invocations.detail(idSchema.parse(req.params.id))));
   app.get('/v1/admin/account', async (_req, res) => res.json(accountStatus
     ? await accountStatus.read()
     : { available: false, authenticated: false, checkedAt: new Date().toISOString() }));

@@ -45,7 +45,7 @@ async function main() {
   };
   try {
     if (values.transport === 'stdio') {
-      const server = createMcpServer(service);
+      const server = createMcpServer(service, 'stdio');
       await server.connect(new StdioServerTransport());
       closeTransport = () => server.close();
       process.stdin.once('end', () => { void shutdown(); });

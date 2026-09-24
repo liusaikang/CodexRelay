@@ -1,8 +1,9 @@
 import { readFile, realpath, stat } from 'node:fs/promises';
-import { dirname, isAbsolute, resolve } from 'node:path';
+import { dirname, isAbsolute, resolve, relative, sep } from 'node:path';
 import { z } from 'zod';
 import { parse } from 'yaml';
 import { AppError, modelReasoningEffortSchema, type RuntimeConfig } from './types.js';
+import { canonicalStoragePath } from './paths.js';
 
 const expandEnv = (value: string) => value.replace(/\$\{([A-Z0-9_]+)(?::-([^}]*))?\}/gi, (_match, key: string, fallback?: string) => {
   const envValue = process.env[key];
@@ -30,6 +31,10 @@ const codexSchema = z.object({
   envAllowlist: z.array(z.string()).default(['CODEX_API_KEY', 'HTTPS_PROXY', 'HTTP_PROXY', 'NO_PROXY']),
 }).strict();
 const configSchema = z.object({
+  invocationLog: z.object({
+    enabled: z.boolean().default(false), directory: z.string().min(1).default('../data/invocation-logs'),
+    retentionDays: z.number().int().min(1).max(3650).default(30),
+  }).strict().prefault({}),
   dataDir: z.string().default('../data/native-service'),
   server: serverSchema.prefault({}), tasks: tasksSchema.prefault({}),
   runner: z.enum(['codex', 'demo']).default('codex'), codex: codexSchema.prefault({}),
@@ -55,7 +60,19 @@ export async function loadConfig(file: string): Promise<RuntimeConfig> {
     throw new Error('server.localConsole requires a loopback-only listener (127.0.0.1 or ::1)');
   }
   const effort = optionalExpanded(config.codex.defaultReasoningEffort);
+  const logDirectory = resolve(base, expandEnv(config.invocationLog.directory));
+  const contains = (parent: string, child: string) => { const rel = relative(parent, child); return !rel || (rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel)); };
+  if (config.invocationLog.enabled) {
+    const canonicalLog = await canonicalStoragePath(logDirectory);
+    for (const protectedPath of [config.dataDir, config.codex.home]) {
+      const protectedDirectory = await canonicalStoragePath(resolve(base, expandEnv(protectedPath)));
+      if (contains(canonicalLog, protectedDirectory) || contains(protectedDirectory, canonicalLog)) {
+        throw new Error('invocationLog.directory must be separate from dataDir and codex.home');
+      }
+    }
+  }
   return {
+    invocationLog: { ...config.invocationLog, directory: logDirectory },
     ...config.server, ...config.tasks, runner: config.runner,
     dataDir: resolve(base, expandEnv(config.dataDir)), codexHome: resolve(base, expandEnv(config.codex.home)),
     defaultWorkingDirectory: await resolveWorkingDirectory(resolve(base, expandEnv(config.codex.defaultWorkingDirectory))),

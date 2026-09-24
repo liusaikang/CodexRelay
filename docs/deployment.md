@@ -4,6 +4,10 @@
 
 ## 本机启动
 
+文件读写使用 Node.js 跨平台 API，配置中的相对路径按 YAML 所在目录解析；Windows、Linux、macOS 均不需要通过 PowerShell 或 shell 命令读取调用日志。Linux/macOS 使用文件权限，Windows 需为部署账户配置目录 ACL。
+
+浏览器回归测试默认使用 Playwright Chromium，先执行 `npx playwright install chromium`；Linux CI 可使用 `npx playwright install --with-deps chromium`。仅在需要已有浏览器时设置 `BROWSER_CHANNEL=msedge` 或 `chrome`。CI 配置覆盖三个操作系统和 Node.js 22/24；新增矩阵不代表尚未运行的平台已经通过验证。
+
 在仓库根目录执行，Windows PowerShell 可将 `npm` 替换为 `npm.cmd`：
 
 ```sh

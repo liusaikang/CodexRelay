@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { resolveWorkingDirectory } from './config.js';
+import { InvocationLog, type InvocationTransport } from './invocations.js';
 import { AppError, isTerminal, submitSchema, type Execution, type Runner, type RuntimeConfig, type Session, type Store, type SubmitInput, type Task } from './types.js';
 
 const now = () => new Date().toISOString();
@@ -17,7 +18,14 @@ export class TaskService {
   private closed = false;
   private fault = false;
   private initialized = false;
-  constructor(readonly config: RuntimeConfig, private store: Store, private runner: Runner) {}
+  readonly invocations: InvocationLog;
+  constructor(readonly config: RuntimeConfig, private store: Store, private runner: Runner) {
+    this.invocations = new InvocationLog(config.invocationLog);
+  }
+  private async saveTask(task: Task) {
+    await this.persist(() => this.store.saveTask(task));
+    await this.invocations.record(task);
+  }
 
   private exclusive<T>(fn: () => Promise<T>): Promise<T> {
     const result = this.serial.then(fn);
@@ -46,9 +54,10 @@ export class TaskService {
         }
         this.tasks.set(task.taskId, task);
       }
+      await this.invocations.open([...this.tasks.values()]);
       this.initialized = true;
       await this.exclusive(() => this.drain());
-    } catch (error) { await this.store.close(); throw error; }
+    } catch (error) { await this.invocations.close(); await this.store.close(); throw error; }
   }
   private available() {
     if (!this.initialized || this.closing || this.fault) throw new AppError('SERVICE_UNAVAILABLE', 'Service is stopping or storage is unavailable.', 503);
@@ -64,7 +73,7 @@ export class TaskService {
     };
     return { ...runtime, configHash: hash({ policy: 'native-full-access-v1', ...runtime, codexHome: this.config.codexHome, runner: this.config.runner, envAllowlist: this.config.envAllowlist, codexPath: this.config.codexPath }) };
   }
-  async submit(raw: SubmitInput) {
+  async submit(raw: SubmitInput, transport: InvocationTransport = 'http') {
     const request = submitSchema.parse(raw);
     return this.exclusive(async () => {
       this.available();
@@ -93,11 +102,12 @@ export class TaskService {
       const canStart = this.active.size < this.config.maxConcurrent && !sessionBusy && !pending.some(t => t.sessionId === session.sessionId);
       if (!canStart && pending.length >= this.config.maxQueued) throw new AppError('QUEUE_FULL', 'Task queue is full. Retry later with the same idempotencyKey.', 429);
       const task: Task = { version: 2, taskId: `task_${randomUUID()}`, sessionId: session.sessionId, request, requestHash, configHash, status: 'queued', createdAt: now(), progress: [] };
+      if (this.invocations.enabled) task.invocationTransport = transport;
       if (!request.sessionId) {
         await this.persist(() => this.store.saveSession(session));
         this.sessions.set(session.sessionId, session);
       }
-      await this.persist(() => this.store.saveTask(task));
+      await this.saveTask(task);
       this.tasks.set(task.taskId, task);
       await this.drain();
       return publicTask(task);
@@ -115,11 +125,11 @@ export class TaskService {
       } catch (error) {
         task.status = 'failed'; task.finishedAt = now();
         task.error = { code: error instanceof AppError ? error.code : 'CONFIG_CHANGED', message: 'Queued task cannot use its original execution context. Submit a new session.' };
-        await this.persist(() => this.store.saveTask(task));
+        await this.saveTask(task);
         continue;
       }
       task.status = 'running'; task.startedAt = now();
-      await this.persist(() => this.store.saveTask(task));
+      await this.saveTask(task);
       const controller = new AbortController();
       const active = { sessionId: task.sessionId, controller, done: Promise.resolve() };
       this.active.set(task.taskId, active);
@@ -164,7 +174,7 @@ export class TaskService {
         if (this.fault) return;
         const finished: Task = { ...task, status: task.stopReason ?? 'succeeded', finishedAt: now() };
         if (!task.stopReason) finished.result = result;
-        await this.persist(() => this.store.saveTask(finished));
+        await this.saveTask(finished);
         Object.assign(task, finished);
       });
     } catch (error) {
@@ -175,7 +185,7 @@ export class TaskService {
           message: task.stopReason ? `Task ${task.stopReason}.` : 'Codex execution failed. Check service diagnostics and model authentication; submit a follow-up when resolved.' };
         // Deliberately omit arbitrary CLI stderr, which can contain credentials or source data.
         console.error(JSON.stringify({ taskId: task.taskId, code: finished.error.code }));
-        await this.persist(() => this.store.saveTask(finished));
+        await this.saveTask(finished);
         Object.assign(task, finished);
       });
     } finally {
@@ -191,7 +201,7 @@ export class TaskService {
       task.stopReason = 'cancelled';
       if (task.status === 'queued') { task.status = 'cancelled'; task.finishedAt = now(); }
       else this.active.get(taskId)?.controller.abort();
-      await this.persist(() => this.store.saveTask(task));
+      await this.saveTask(task);
       return publicTask(task);
     });
   }
@@ -232,6 +242,7 @@ export class TaskService {
       }
     });
     await Promise.all([...this.active.values()].map(r => r.done));
+    await this.invocations.close();
     await this.store.close();
     this.closed = true;
   }

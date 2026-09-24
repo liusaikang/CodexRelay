@@ -1,5 +1,9 @@
 # All paths are relative to this file. Restart after editing configuration.
 dataDir: ../data/native-service
+invocationLog:
+  enabled: false
+  directory: ../data/invocation-logs
+  retentionDays: 30
 server:
   host: 127.0.0.1
   port: 8787

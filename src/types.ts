@@ -27,6 +27,7 @@ export const taskSchema = z.object({
   version: z.union([z.literal(1), z.literal(2)]), taskId: idSchema, sessionId: idSchema,
   request: storedRequestSchema, requestHash: z.string(), configHash: z.string(),
   status: statusSchema, createdAt: z.string(), startedAt: z.string().optional(), finishedAt: z.string().optional(),
+  invocationTransport: z.enum(['http', 'mcp', 'stdio']).optional(),
   stopReason: z.enum(['cancelled', 'timed_out', 'interrupted']).optional(),
   error: z.object({ code: z.string(), message: z.string() }).optional(),
   result: resultSchema.optional(), progress: z.array(progressSchema),
@@ -41,6 +42,7 @@ export type Task = z.infer<typeof taskSchema>;
 export type Session = z.infer<typeof sessionSchema>;
 export type RunResult = z.infer<typeof resultSchema>;
 export interface RuntimeConfig {
+  invocationLog?: { enabled: boolean; directory: string; retentionDays: number };
   dataDir: string; codexHome: string; host: string; port: number;
   tokenEnv: string; localConsole?: boolean; allowedHosts: string[]; allowedOrigins: string[];
   maxConcurrent: number; maxQueued: number; runner: 'codex' | 'demo';

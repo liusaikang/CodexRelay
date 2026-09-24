@@ -30,8 +30,9 @@ const accountStatus: AccountStatusProvider = {
 beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), 'codex-api-'));
   const config = await loadConfig(resolve('config/demo.yaml'));
-  config.dataDir = dir;
-  service = new TaskService(config, new FileStore(dir), new DemoRunner());
+  config.dataDir = join(dir, 'core');
+  config.invocationLog = { enabled: true, directory: join(dir, 'logs'), retentionDays: 30 };
+  service = new TaskService(config, new FileStore(config.dataDir), new DemoRunner());
   await service.init();
   server = createHttpApp(service, token, accountStatus).listen(0, '127.0.0.1');
   await new Promise<void>(r => server.once('listening', r));
@@ -46,6 +47,27 @@ it('serves protected account status and supports a forced refresh', async () => 
   });
   const refreshed = await (await fetch(`${base}/v1/admin/account/refresh`, { method: 'POST', headers, body: '{}' })).json();
   expect(refreshed.quota.primary.remainingPercent).toBe(59);
+});
+
+it('protects invocation records and exposes filtered summaries without duplicating retries', async () => {
+  expect((await fetch(`${base}/v1/admin/invocations`)).status).toBe(401);
+  const request = { question: 'log-panel-test', context: { account: 'demo-user' }, idempotencyKey: 'log-test' };
+  const submitted = await (await fetch(`${base}/v1/tasks`, { method: 'POST', headers, body: JSON.stringify(request) })).json();
+  await fetch(`${base}/v1/tasks`, { method: 'POST', headers, body: JSON.stringify(request) });
+  await expect.poll(() => service.getTask(submitted.taskId).status).toBe('succeeded');
+  const list = await (await fetch(`${base}/v1/admin/invocations?keyword=log-panel&status=succeeded&limit=1`, { headers })).json();
+  expect(list).toMatchObject({ enabled: true, healthy: true, total: 1 });
+  expect(list.items[0]).toMatchObject({ transport: 'http', questionPreview: request.question });
+  expect(list.items[0]).not.toHaveProperty('context');
+  const detail = await (await fetch(`${base}/v1/admin/invocations/${submitted.taskId}`, { headers })).json();
+  expect(detail.context).toEqual(request.context);
+  expect(detail.resultMarkdown).toContain('未调用 Codex');
+  expect(JSON.stringify(detail)).not.toContain(token);
+  const summary = await (await fetch(`${base}/v1/admin/invocations/summary`, { headers })).json();
+  expect(summary).toMatchObject({ total: 1, succeeded: 1, successRate: 100 });
+  for (const query of ['limit=101', 'status=oops', 'from=invalid', 'offset=-1']) {
+    expect((await fetch(`${base}/v1/admin/invocations?${query}`, { headers })).status).toBe(400);
+  }
 });
 afterEach(async () => {
   await service.close();
@@ -84,6 +106,10 @@ it('serves a token-free console and accepts authenticated same-origin browser su
   expect(html).toContain('CodexRelay');
   expect(html).toContain('账号额度');
   expect(html).not.toContain(token);
+  const logScript = await fetch(`${base}/assets/invocations.js`);
+  expect(logScript.status).toBe(200);
+  expect(logScript.headers.get('content-type')).toContain('javascript');
+  expect(await logScript.text()).not.toContain(token);
   const session = await fetch(`${base}/console/session`);
   expect(session.status).toBe(200);
   expect(await session.json()).toMatchObject({ token, runner: 'demo' });

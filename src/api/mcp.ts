@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { TaskService } from '../service.js';
 import { AppError, idSchema, pageSchema, submitSchema } from '../types.js';
 
-export function createMcpServer(service: TaskService) {
+export function createMcpServer(service: TaskService, transport: 'mcp' | 'stdio' = 'mcp') {
   const server = new McpServer({ name: 'codex-task-mcp', version: '0.1.0' });
   const outputSchema = { data: z.unknown() };
   async function respond(operation: () => unknown | Promise<unknown>) {
@@ -21,7 +21,7 @@ export function createMcpServer(service: TaskService) {
     description: 'Submit a question and optional structured context to the native Codex Harness with full local execution, network and live web-search access, then immediately return taskId/sessionId/status. Poll codex_get_task. The service uses its configured working directory, model and reasoning effort. Omit sessionId for a new task; pass it to continue the same Codex thread. Reuse idempotencyKey only when retrying the identical question and context.',
     inputSchema: submitSchema.shape, outputSchema,
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
-  }, input => respond(() => service.submit(input)));
+  }, input => respond(() => service.submit(input, transport)));
   server.registerTool('codex_get_task', {
     title: '查询分析任务', description: 'Get task status, last 100 progress events, Markdown result, usage and error code. Terminal statuses: succeeded, failed, cancelled, timed_out, interrupted. Poll every 2-5 seconds.',
     inputSchema: { taskId: idSchema }, outputSchema, annotations: read,

@@ -59,6 +59,9 @@ stdio 依赖本机操作系统权限，日志写 stderr，stdout 留给协议。
 | GET | /v1/info | 服务信息，替代旧能力发现接口 |
 | GET | /v1/admin/account | 读取脱敏账号与额度信息 |
 | POST | /v1/admin/account/refresh | 强制刷新脱敏账号与额度信息 |
+| GET | /v1/admin/invocations | 分页查询调用日志摘要 |
+| GET | /v1/admin/invocations/summary | 筛选范围内的统计 |
+| GET | /v1/admin/invocations/:taskId | 完整提示词、上下文、结果与用量 |
 | POST | /v1/tasks | 提交任务，HTTP 202 |
 | GET | /v1/tasks/:taskId | 查询任务 |
 | POST | /v1/tasks/:taskId/cancel | 请求取消 |
@@ -92,6 +95,24 @@ Invoke-RestMethod "http://127.0.0.1:8787/v1/tasks/$($task.taskId)" -Headers $hea
   "idempotencyKey": "feedback-demo-001-followup"
 }
 ```
+
+## 运维控制台会话排查
+
+控制台的 Codex 调用页通过现有会话、任务与健康接口读取记录，不依赖调用日志开关。选择会话后先展示最近 20 轮，可继续加载更早记录；续问追加到同一会话，不覆盖历史结果。支持按 `taskId` 或 `sessionId` 定位，以及查看每轮原始请求、上下文、结果、错误和最近执行事件。
+
+页面显示运行数、排队数、并发与队列上限、接收/开始/结束时间和排队/执行耗时。自动刷新默认开启，仅在该标签页可见时进行，刷新间隔为上一次查询完成后 5 秒；阅读旧记录时不会强制跳到最新结果。单条详情读取失败与任务执行失败分别呈现。
+
+这些记录只覆盖当前实例已接受的任务，不是 HTTP 访问审计。未找到记录不能证明请求未到达：应核对目标实例、任务 ID、调用方请求及鉴权/参数校验结果。没有新执行事件也不等于任务卡死；任务成功但没有非空结果会单独提示。提交超时或网络中断时结果可能未知，不应直接以新幂等键重复提交。
+
+## 调用日志查询
+
+日志接口使用同一 Bearer Token。列表和汇总支持 `from`、`to`（带时区的 ISO 8601 时间，按提交时间筛选，两端包含）、`status`、`keyword`（提示词大小写不敏感的子串匹配，最多 200 字符）。列表另支持 `offset`（默认 0）与 `limit`（默认 20，上限 100），按提交时间倒序、任务 ID 倒序排列。首页本地时间筛选会转换成 UTC 后传入。
+
+列表返回 `{ enabled, healthy, retentionDays, total, offset, limit, items }`，每行只有提示词/结果前 160 字符、任务和会话 ID、来源、时间、状态、耗时及 Token 总量；点击详情才获取完整 `question/context/resultMarkdown/usage/error`。所有记录作为纯文本展示，不执行返回内容中的 HTML。
+
+汇总统计当前筛选范围的任务：`successRate` = 成功数 / 已结束数（含失败、取消、超时、中断）；`failed` 包含失败、超时、中断，不含取消；`averageDurationMs` 只计算同时有开始和结束时间的任务，不含排队等待；`totalTokens` 只累加 `input_tokens + output_tokens`，缓存/推理子项不重复累加；`usageKnownTasks` 标记实际报告用量的任务数。无样本的成功率/平均耗时为 `null`，缺失用量不代表零消耗。
+
+禁用时列表和汇总返回 `enabled: false` 与空数据，详情返回 HTTP 409 `INVOCATION_LOG_DISABLED`。文件错误时 `healthy: false`，统计可能不完整。保留期以外或不存在的详情返回 404。此功能按已接受的任务记录，不是每个 HTTP 请求的访问日志，不提供日志删除接口。
 
 ## 状态与结果
 

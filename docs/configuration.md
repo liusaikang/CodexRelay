@@ -36,6 +36,25 @@ codex:
 
 新配置不存在 `projects`、`capabilities`、`promptFile`、`skillFiles`、`mcpServers`，也不再使用顶层 `codexHome` 或 `execution`。这些旧字段不是新结构的别名，应删除并迁移，不要混用。
 
+## 调用日志
+
+```yaml
+invocationLog:
+  enabled: false
+  directory: ../data/invocation-logs
+  retentionDays: 30
+```
+
+`enabled` 默认关闭。设置为 `true` 并重启后，所有入口成功接受的新分析任务都会记录，来源为 `http`、`mcp` 或 `stdio`。`directory` 相对于 YAML 文件解析，支持环境变量；解析真实路径后必须与 `dataDir`、`codex.home` 分离。日志根目录及其内部不能是符号链接或目录联接；允许受信任的父级路径包含系统链接（如 macOS 临时目录），启动时固定父级的真实位置，后续不随别名改变而切换日志位置。`retentionDays` 取值 1–3650，默认 30 天。
+
+日志以 UTC 提交日期分目录，每个任务一个 JSON 文件：`data/invocation-logs/YYYY-MM-DD/task_<uuid>.json`。记录用户提交的 `question`、可选 `context`、会话和任务 ID、来源、各阶段时间、状态、耗时、结果、用量及安全化错误。它不是 Codex 完整内部提示词、系统提示词或原生线程事件日志。幂等重试返回原任务，统计不会重复计数；轮询、鉴权失败、参数错误和队列满等未接受的请求不计入。
+
+关闭后不新增、不读取、不清理调用日志，旧文件保留，控制台显示未启用。开关只影响这份可选日志；核心任务 JSON 和 Codex 线程依然保存问题与结果，用于恢复、查询和上下文。重新开启不补录关闭期间的新任务，只恢复曾标记记录的任务。启动及每小时清理超过保留天数的已结束日志文件，时间以任务提交时间为准，正在运行或排队的任务保留。核心任务和原生线程不参与此清理。
+
+日志不收集认证请求头、服务令牌、认证文件或环境变量。用户主动传入问题/上下文或 Codex 回答中的敏感内容仍会原样保存，调用方应在提交前脱敏。默认 `data/` 已被 Git 忽略；自定义目录也应排除在提交和公开静态目录之外。Unix 新文件使用 `0600`、新目录使用 `0700`，Windows 使用部署账户的文件 ACL。
+
+日志写入失败不会把成功任务改成失败，控制台通过 `healthy: false` 标记记录可能不完整，修复目录并重启后从核心任务恢复尚在保留期的已标记记录。单实例文件存储会加载保留期内的记录到内存，保留天数应结合调用量配置；不支持多个实例共用日志目录。
+
 ## 请求与默认值
 
 新会话始终使用 `codex.defaultWorkingDirectory`、`codex.defaultModel` 和 `codex.defaultReasoningEffort`。默认工作目录必须存在并且运行账户可访问。

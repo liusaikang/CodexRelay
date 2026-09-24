@@ -23,7 +23,11 @@
     .task-shell{max-width:1560px;margin:0 auto;background:white;display:grid;grid-template-columns:370px minmax(0,1fr)}.task-sidebar{border-right:1px solid var(--line);min-width:0}.compose,.history{padding:25px 24px}.history{border-top:1px solid var(--line)}.section-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:17px}.section-heading h2{font-size:16px;margin:0}.eyebrow{font-size:11px;color:var(--muted)}.field{margin-bottom:17px}.optional,.field-help{font-weight:400;color:var(--muted)}.field-help{font-size:11px;margin-top:6px}.session-line{display:flex;gap:8px}.submit{width:100%;height:42px}
     .history-list{list-style:none;margin:0;padding:0}.history-list li{border-bottom:1px solid #edf0ee}.history-list button{width:100%;border:0;border-radius:0;padding:10px 0;text-align:left;justify-content:flex-start;background:transparent;white-space:normal}.history-title{font-size:12px;overflow-wrap:anywhere}.history-time{display:block;font-size:10px;color:var(--muted)}
     .workspace{padding:26px 30px;min-width:0}.task-status{display:inline-block;padding:4px 9px;border-radius:4px;background:var(--surface);font-size:12px;color:var(--muted)}.task-status[data-state=succeeded]{background:#e4f4ec;color:#06734e}.task-status[data-state=running],.task-status[data-state=queued]{background:#edf1ff;color:var(--blue)}.task-status[data-state=failed],.task-status[data-state=timed_out]{background:#fdeceb;color:var(--red)}.task-id{font-size:12px;color:var(--muted);overflow-wrap:anywhere}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;padding:17px 0;margin-top:16px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.stat-label{font-size:11px;color:var(--muted)}.stat-value{margin-top:3px}.meta{display:grid;grid-template-columns:70px minmax(0,1fr);gap:7px 12px;margin:16px 0;font-size:12px}.meta dt{color:var(--muted)}.meta dd{margin:0;overflow-wrap:anywhere}
+    .ops-health{max-width:1560px;margin:auto;display:flex;flex-wrap:wrap;align-items:center;gap:10px 24px;padding:12px 24px;background:white;border-bottom:1px solid var(--line);font-size:12px}.ops-health strong{font-size:15px}.ops-health .error{color:var(--red)}.lookup{display:flex;gap:8px;align-items:end;padding-bottom:18px;border-bottom:1px solid var(--line);margin-bottom:20px}.lookup .field{flex:1;min-width:0;margin:0}.history-list button{flex-direction:column;align-items:flex-start;gap:3px;padding:12px 6px}.history-list button[aria-current=true]{background:var(--soft);border-left:3px solid var(--green)}.history-title{word-break:break-all}.history-paging{display:flex;justify-content:space-between;align-items:center;margin-top:12px;gap:8px}.conversation-heading{flex-wrap:wrap}.conversation-heading .row{flex-wrap:wrap}.conversation-scope{color:var(--muted);font-size:12px;margin:10px 0}.conversation-scroll{height:660px;max-height:75vh;min-height:360px;overflow:auto;scrollbar-gutter:stable;overflow-anchor:none}.turn{border-bottom:1px solid var(--line);padding:20px 4px;min-width:0}.turn.focused{border-left:3px solid var(--green);padding-left:12px}.turn-header{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.turn-header h3{font-size:14px;margin:0}.turn-id{font-size:11px;color:var(--muted);overflow-wrap:anywhere;flex:1 1 250px}.turn h4{font-size:12px;margin:16px 0 5px;color:var(--muted)}.turn-question,.turn-answer{white-space:pre-wrap;overflow-wrap:anywhere;margin:0;font:inherit}.turn-answer{line-height:1.85}.turn-times{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 18px;margin:14px 0;font-size:11px}.turn-times dt{color:var(--muted)}.turn-times dd{margin:1px 0 0;overflow-wrap:anywhere}.turn-note{font-size:12px;padding:10px 12px;background:var(--surface);border-left:3px solid #aeb9b2;white-space:pre-wrap;overflow-wrap:anywhere}.turn-note.error{color:var(--red);background:#fff4f3;border-color:var(--red)}.turn details{margin-top:16px}.turn summary{cursor:pointer;font-size:12px;color:var(--blue);padding:6px 0}.turn .json{max-height:320px;min-width:0}.conversation-empty{padding:48px 12px;text-align:center;color:var(--muted)}#load-older{margin:0 auto 12px;display:flex}#task-message{max-width:1512px}.task-status[data-state=interrupted],.task-status[data-state=cancelled]{background:#fff4dd;color:#85611a}
+    @media(max-width:680px){.ops-health{padding:12px 16px;gap:8px 18px}.lookup{flex-wrap:wrap}.turn-times{grid-template-columns:repeat(2,minmax(0,1fr))}.conversation-scroll{height:560px;max-height:75vh}.conversation-heading .row{gap:6px}}
     .detail-tabs{display:flex;gap:22px;border-bottom:1px solid var(--line);margin-top:21px}.detail-tab{border:0;border-radius:0;border-bottom:2px solid transparent;background:transparent!important;padding:10px 0;color:var(--muted)}.detail-tab[aria-selected=true]{border-bottom-color:var(--green);color:var(--green);font-weight:600}.detail-pane{padding-top:18px;min-height:290px}.result{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font:14px/1.9 "Segoe UI","Microsoft YaHei",sans-serif}.empty{min-height:250px;display:grid;place-items:center;color:#8b9890}.json{padding:16px;background:var(--surface);border:1px solid var(--line);border-radius:6px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;max-height:460px;overflow:auto}
+    .log-shell{max-width:1560px;margin:auto;padding:28px 24px;background:white}.log-heading{display:flex;justify-content:space-between;align-items:center;gap:16px}.log-heading h2{margin:0;font-size:20px}.log-metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));border-block:1px solid var(--line);margin:22px 0}.log-metrics>div{padding:18px 12px;min-width:0}.log-metrics dt{font-size:12px;color:var(--muted)}.log-metrics dd{margin:6px 0 0;font-size:22px;overflow-wrap:anywhere}.log-filters{display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin:20px 0}.log-filters>div{flex:1 1 180px;min-width:0}.log-filters select{width:100%;height:40px;padding:6px;border:1px solid var(--line);border-radius:6px;background:white;font:inherit;color:var(--ink)}.log-table-wrap{overflow:auto}.log-table{width:100%;min-width:920px;border-collapse:collapse;text-align:left;table-layout:fixed;font-size:12px}.log-table th{background:var(--surface);color:var(--muted);font-weight:600}.log-table th,.log-table td{padding:12px 9px;border-bottom:1px solid var(--line);vertical-align:top;overflow-wrap:anywhere}.log-table th:first-child{width:150px}.log-table th:nth-child(2),.log-table th:nth-child(3){width:23%}.log-table th:last-child{width:60px}.log-pagination{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:18px}.log-shell .message{margin:14px 0}.log-empty{text-align:center;padding:36px;color:var(--muted)}.log-detail{width:min(900px,calc(100% - 32px));max-height:85vh;border:1px solid var(--line);border-radius:8px;padding:24px;color:var(--ink)}.log-detail::backdrop{background:#0006}.log-detail h3{font-size:14px;margin:20px 0 8px}.log-detail pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;background:var(--surface);padding:14px;border-radius:4px}.log-detail .meta{grid-template-columns:85px minmax(0,1fr)}
+    @media(max-width:680px){.log-shell{padding:20px 16px}.log-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.log-metrics dd{font-size:19px}.log-pagination{flex-wrap:wrap}.log-detail{padding:16px}}
     footer{padding:15px 32px;border-top:1px solid var(--line);background:white;display:flex;justify-content:space-between;gap:12px;color:var(--muted);font-size:11px}
     @media(max-width:900px){header,.quick-nav{padding-left:20px;padding-right:20px}.task-shell{grid-template-columns:320px minmax(0,1fr)}.compose,.history{padding:22px 18px}.workspace{padding:24px 20px}}
     @media(max-width:680px){header{height:66px;padding:0 16px}.subtitle{display:none}h1{font-size:18px}.quick-nav{height:48px;padding:0 16px;gap:20px}.view{min-height:calc(100vh - 151px)}.account-shell{margin:28px auto;width:min(100% - 24px,760px)}.page-heading{flex-direction:column;align-items:stretch}.page-heading button{align-self:flex-start}.account-panel{padding:20px}.facts{grid-template-columns:1fr}.fact+.fact{border-left:0;border-top:1px solid var(--line)}.quota-details{flex-direction:column;gap:2px}.connection-strip{grid-template-columns:1fr;padding:16px}.task-shell{display:flex;flex-direction:column}.task-sidebar{border-right:0}.workspace{border-top:1px solid var(--line);padding:22px 16px}.compose,.history{padding:22px 16px}.stats{gap:10px}.detail-tabs{gap:17px}.message{margin:12px 16px 0}footer{padding:14px 16px;flex-direction:column}}
@@ -38,6 +42,7 @@
   <nav class="quick-nav" aria-label="快捷栏">
     <button type="button" data-view="account-view" aria-current="page"><i data-lucide="gauge"></i>账号额度</button>
     <button type="button" data-view="task-view" aria-current="false"><i data-lucide="messages-square"></i>Codex 调用</button>
+    <button type="button" data-view="logs-view" aria-current="false"><i data-lucide="list-filter"></i>调用日志</button>
   </nav>
 
   <section id="account-view" class="view">
@@ -59,6 +64,7 @@
       <div class="field"><label for="auth-source">认证来源</label><input id="auth-source" value="由服务环境变量 CODEX_MCP_TOKEN 自动提供" readonly></div>
       <button type="button" id="reconnect"><i data-lucide="plug-zap"></i>重新连接</button>
     </section>
+    <section class="ops-health" aria-label="服务调度状态"><span>运行中 <strong id="health-running">—</strong></span><span>排队中 <strong id="health-queued">—</strong></span><span id="health-capacity" class="muted">并发上限 — · 队列上限 —</span><span id="health-updated" class="muted">尚未读取</span><span id="health-error" class="error hidden" role="status"></span></section>
     <div id="task-message" class="message hidden" role="alert"></div>
     <main class="task-shell">
       <aside class="task-sidebar">
@@ -69,34 +75,69 @@
           <div class="field"><label for="session">会话 ID <span class="optional">· 可选</span></label><div class="session-line"><input id="session" class="mono" placeholder="留空创建新会话" disabled><button type="button" id="new-session" class="icon" title="新建会话" aria-label="新建会话" disabled><i data-lucide="plus"></i></button></div></div>
           <button type="submit" id="submit" class="primary submit" disabled><i data-lucide="send"></i><span id="submit-label">提交任务</span></button>
         </form>
-        <section class="history"><div class="section-heading"><h2>最近会话</h2><button type="button" id="refresh-sessions" class="icon" title="刷新会话" aria-label="刷新会话" disabled><i data-lucide="refresh-cw"></i></button></div><ul id="sessions" class="history-list"><li class="muted">暂无会话</li></ul></section>
+        <section class="history"><div class="section-heading"><h2>最近会话</h2><button type="button" id="refresh-sessions" class="icon" title="刷新会话" aria-label="刷新会话" disabled><i data-lucide="refresh-cw"></i></button></div><ul id="sessions" class="history-list"><li class="muted">暂无会话</li></ul><div class="history-paging"><span id="sessions-page" class="muted">共 0 个</span><div class="row"><button id="session-prev" type="button" class="icon" title="上一页会话" aria-label="上一页会话" disabled><i data-lucide="chevron-left"></i></button><button id="session-next" type="button" class="icon" title="下一页会话" aria-label="下一页会话" disabled><i data-lucide="chevron-right"></i></button></div></div></section>
       </aside>
       <section class="workspace">
-        <div class="section-heading"><div class="row"><h2>执行记录</h2><span id="task-status" class="task-status">尚未提交</span></div><span id="task-id" class="task-id">—</span></div>
-        <div class="stats"><div><div class="stat-label">创建时间</div><div id="created" class="stat-value">—</div></div><div><div class="stat-label">执行耗时</div><div id="duration" class="stat-value">—</div></div><div><div class="stat-label">Token 用量</div><div id="usage" class="stat-value">—</div></div></div>
+        <form id="task-lookup" class="lookup"><div class="field"><label for="lookup-id">任务或会话 ID</label><input id="lookup-id" class="mono" placeholder="task_… / sess_…" maxlength="64"></div><button type="submit" title="定位记录" aria-label="定位记录"><i data-lucide="search"></i>查询</button></form>
+        <div class="section-heading conversation-heading"><div class="row"><h2>会话记录</h2><span id="conversation-count" class="muted">尚未选择</span></div><div class="row"><label class="row" style="margin:0"><input id="auto-refresh" type="checkbox" checked style="width:16px;height:16px">自动刷新</label><button id="refresh-conversation" type="button" class="icon" title="刷新会话记录" aria-label="刷新会话记录" disabled><i data-lucide="refresh-cw"></i></button></div></div>
         <dl class="meta"><dt>会话</dt><dd id="active-session" class="mono">—</dd><dt>工作目录</dt><dd id="active-directory" class="mono">—</dd></dl>
-        <div class="detail-tabs" role="tablist" aria-label="执行详情"><button type="button" class="detail-tab" role="tab" aria-selected="true" data-pane="result-pane">分析结果</button><button type="button" class="detail-tab" role="tab" aria-selected="false" data-pane="payload-pane">请求 / 响应</button></div>
-        <section id="result-pane" class="detail-pane"><div id="result-empty" class="empty">暂无分析结果</div><pre id="result" class="result hidden" aria-live="polite"></pre></section>
-        <section id="payload-pane" class="detail-pane hidden"><label>请求体</label><pre id="request-json" class="json">{}</pre><label>响应体</label><pre id="response-json" class="json">{}</pre></section>
+        <div class="conversation-scope">记录范围：当前服务实例已接受的任务。未查到记录不能证明请求未到达；鉴权拒绝、参数错误等不在此列表。</div>
+        <div id="conversation-scroll" class="conversation-scroll" tabindex="0" aria-label="多轮会话记录"><button id="load-older" type="button" class="hidden"><i data-lucide="history"></i>加载更早记录</button><div id="conversation-empty" class="conversation-empty">请选择会话或查询任务 ID</div><div id="turns"></div></div>
       </section>
     </main>
   </section>
+  <section id="logs-view" class="view hidden">
+    <main class="log-shell">
+      <div class="log-heading"><h2>调用日志</h2><button id="logs-refresh" type="button" title="刷新日志" aria-label="刷新日志"><i data-lucide="refresh-cw"></i>刷新</button></div>
+      <div id="logs-message" class="message hidden" role="alert"></div>
+      <dl class="log-metrics">
+        <div><dt>调用总数</dt><dd id="logs-total">—</dd></div><div><dt>已结束任务成功率</dt><dd id="logs-rate">—</dd></div><div><dt>失败 / 超时 / 中断</dt><dd id="logs-failed">—</dd></div><div><dt>平均执行耗时</dt><dd id="logs-duration">—</dd></div><div><dt>已报告 Token 用量</dt><dd id="logs-tokens">—</dd></div>
+      </dl>
+      <form id="logs-filters" class="log-filters">
+        <div><label for="logs-from">起始时间</label><input id="logs-from" type="datetime-local"></div>
+        <div><label for="logs-to">截止时间</label><input id="logs-to" type="datetime-local"></div>
+        <div><label for="logs-status">任务状态</label><select id="logs-status"><option value="">全部状态</option value="queued">排队中</option><option value="running">执行中</option><option value="succeeded">已完成</option><option value="failed">失败</option><option value="timed_out">已超时</option><option value="interrupted">已中断</option><option value="cancelled">已取消</option></select></div>
+        <div><label for="logs-keyword">提示词关键字</label><input id="logs-keyword" type="search" maxlength="200"></div>
+        <button type="submit" class="primary"><i data-lucide="search"></i>查询</button><button type="reset" title="重置筛选" aria-label="重置筛选" class="icon"><i data-lucide="rotate-ccw"></i></button>
+      </form>
+      <div class="log-table-wrap"><table class="log-table"><thead><tr><th>提交时间</th><th>提示词</th><th>结果摘要</th><th>状态 / 来源</th><th>耗时</th><th>Token</th><th>详情</th></tr></thead><tbody id="logs-rows"></tbody></table></div>
+      <div id="logs-empty" class="log-empty">暂无调用记录</div>
+      <div class="log-pagination"><span id="logs-range" class="muted">共 0 条</span><div class="row"><button type="button" id="logs-prev" class="icon" title="上一页" aria-label="上一页" disabled><i data-lucide="chevron-left"></i></button><button type="button" id="logs-next" class="icon" title="下一页" aria-label="下一页" disabled><i data-lucide="chevron-right"></i></button></div></div>
+    </main>
+    <dialog id="logs-detail" class="log-detail" aria-labelledby="logs-detail-title">
+      <div class="log-heading"><h2 id="logs-detail-title">调用详情</h2><button id="logs-close" type="button" class="icon" title="关闭详情" aria-label="关闭详情"><i data-lucide="x"></i></button></div>
+      <dl id="logs-detail-meta" class="meta"></dl><h3>提示词</h3><pre id="logs-detail-question"></pre><h3>附加上下文</h3><pre id="logs-detail-context"></pre><h3>Codex 返回结果</h3><pre id="logs-detail-result"></pre><h3>错误信息</h3><pre id="logs-detail-error"></pre><h3>Token 用量</h3><pre id="logs-detail-usage"></pre>
+    </dialog>
+  </section>
   <footer><span>CodexRelay / Codex SDK</span><span id="last-updated">尚未同步</span></footer>
 
-  <script>
+  <script type="module">
     'use strict';
     const $ = id => document.getElementById(id);
     window.lucide?.createIcons();
-    let token = '', serviceInfo = null, task = null, pollTimer = null, submitting = false, taskReady = false;
+    let token = '', serviceInfo = null, submitting = false, taskReady = false;
+    let selectedSession = '', viewEpoch = 0, historyOffset = 0, totalTurns = 0, refreshEpoch = null, monitorTimer;
+    let sessionsOffset = 0, sessionsTotal = 0, sessionListEpoch = 0;
+    const turnRows = new Map();
     const terminal = item => !['queued','running'].includes(item.status);
     const labels = {queued:'排队中',running:'执行中',succeeded:'已完成',failed:'失败',cancelled:'已取消',timed_out:'已超时',interrupted:'已中断'};
     const formatTime = value => value ? new Date(value).toLocaleString('zh-CN', {hour12:false}) : '—';
     function serviceStatus(label, state = '') { $('service-label').textContent = label; $('service-status').className = 'service-status' + (state ? ' ' + state : ''); }
     function message(id, value = '') { $(id).textContent = value; $(id).classList.toggle('hidden', !value); }
+    let invocationPanelPromise;
+    async function loadInvocationPanel() {
+      try {
+        invocationPanelPromise ??= import('/assets/invocations.js').then(({createInvocationPanel}) => createInvocationPanel({api,formatTime,labels}));
+        await (await invocationPanelPromise).load();
+      } catch {
+        invocationPanelPromise = undefined;
+        message('logs-message','日志面板加载失败，请确认服务已重启到最新版本后刷新页面。');
+      }
+    }
     async function api(path, options = {}) {
       const response = await fetch(path, {...options, headers:{Authorization:'Bearer ' + token,...(options.body ? {'Content-Type':'application/json'} : {})},signal:AbortSignal.timeout(15000)});
       const body = await response.json();
-      if (!response.ok) throw new Error(body.error?.message || '请求失败');
+      if (!response.ok) { const error = new Error(body.error?.message || '请求失败'); error.status = response.status; throw error; }
       return body;
     }
     async function bootstrap() {
@@ -125,7 +166,10 @@
     async function loadAccount(force = false) {
       $('refresh-account').disabled = true; message('account-message');
       try { renderAccount(await api(force ? '/v1/admin/account/refresh' : '/v1/admin/account',force ? {method:'POST'} : {})); }
-      catch (error) { message('account-message',error.message || String(error)); }
+      catch (error) {
+        renderAccount({available:false,authenticated:false});
+        message('account-message',error.name === 'TimeoutError' ? '账号额度查询超时，请点击刷新重试。' : error.message || String(error));
+      }
       finally { $('refresh-account').disabled = false; }
     }
     function syncTaskControls() {
@@ -133,45 +177,172 @@
       for (const id of ['question','context','session','new-session','refresh-sessions']) $(id).disabled = !enabled;
       $('submit').disabled = !enabled;
       $('submit-label').textContent = submitting ? '提交中…' : '提交任务';
+      for (const button of $('sessions').querySelectorAll('button')) button.disabled = submitting;
+      $('session-prev').disabled = !enabled || sessionsOffset === 0;
+      $('session-next').disabled = !enabled || sessionsOffset + 6 >= sessionsTotal;
     }
     function resetTask() {
-      clearTimeout(pollTimer); task = null;
-      $('task-status').textContent = '尚未提交'; $('task-status').dataset.state = ''; $('task-id').textContent = '—';
-      for (const id of ['created','duration','usage','active-session','active-directory']) $(id).textContent = '—';
-      $('result').textContent = ''; $('result').classList.add('hidden'); $('result-empty').classList.remove('hidden'); $('request-json').textContent = '{}'; $('response-json').textContent = '{}';
+      viewEpoch++; refreshEpoch = null; selectedSession = ''; turnRows.clear(); historyOffset = 0; totalTurns = 0;
+      $('session').value = '';
+      $('turns').replaceChildren(); $('active-session').textContent = '—'; $('active-directory').textContent = '—';
+      $('conversation-count').textContent = '尚未选择'; $('conversation-empty').textContent = '请选择会话或查询任务 ID'; $('conversation-empty').classList.remove('hidden');
+      $('load-older').classList.add('hidden'); $('refresh-conversation').disabled = true;
+      markSession();
     }
-    function renderTask(item) {
-      task = item; $('task-status').textContent = labels[item.status] || item.status; $('task-status').dataset.state = item.status; $('task-id').textContent = item.taskId;
-      $('created').textContent = formatTime(item.createdAt);
-      const elapsed = item.startedAt ? Math.max(0,(new Date(item.finishedAt || Date.now()) - new Date(item.startedAt)) / 1000) : null; $('duration').textContent = elapsed === null ? '—' : elapsed.toFixed(1) + ' s';
-      const usage = item.result?.usage; $('usage').textContent = usage ? ((usage.input_tokens || 0) + (usage.output_tokens || 0)).toLocaleString() : '—';
-      $('active-session').textContent = item.sessionId || '—'; $('active-directory').textContent = item.workingDirectory || item.result?.workingDirectory || serviceInfo?.defaultWorkingDirectory || '—';
-      $('request-json').textContent = JSON.stringify(item.request || {},null,2); $('response-json').textContent = JSON.stringify(item,null,2);
-      const result = item.result?.markdown || item.error?.message || ''; $('result').textContent = result; $('result').classList.toggle('hidden',!result); $('result-empty').classList.toggle('hidden',!!result);
-      $('result-empty').textContent = item.status === 'queued' ? '任务正在排队' : item.status === 'running' ? 'Codex 正在分析…' : '暂无分析结果';
+    function markSession() {
+      for (const button of $('sessions').querySelectorAll('button')) button.setAttribute('aria-current',String(button.dataset.sessionId === selectedSession));
+    }
+    const element = (tag, className, text) => { const node = document.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = text; return node; };
+    const elapsed = (start, end) => start ? Math.max(0,(Date.parse(end || new Date().toISOString()) - Date.parse(start)) / 1000).toFixed(1) + ' s' : '—';
+    function renderConversation({older = false, latest = false, focusId} = {}) {
+      const scroller = $('conversation-scroll'), height = scroller.scrollHeight, top = scroller.scrollTop;
+      const atBottom = height - top - scroller.clientHeight < 50;
+      const expanded = new Set([...$('turns').querySelectorAll('details[open]')].map(node => node.dataset.taskId));
+      $('turns').replaceChildren();
+      for (const row of [...turnRows.values()].sort((a,b) => a.ordinal - b.ordinal)) {
+        const item = row.data || row.summary;
+        const article = element('article','turn'); article.dataset.taskId = item.taskId;
+        if (item.taskId === focusId) article.classList.add('focused');
+        const header = element('div','turn-header'), state = element('span','task-status',labels[item.status] || item.status); state.dataset.state = item.status;
+        header.append(element('h3','',row.ordinal ? `第 ${row.ordinal} 轮` : '定位任务'),state,element('span','turn-id mono',item.taskId)); article.append(header);
+        article.append(element('h4','','问题'),element('p','turn-question',item.request?.question ?? row.summary.question));
+        if (row.error) {
+          article.append(element('p','turn-note error',`详情读取失败：${row.error}。这不是任务执行失败，可刷新重试。`));
+        } else {
+          const usage = item.result?.usage, progress = item.progress || [], lastEvent = progress.at(-1);
+          const times = element('dl','turn-times');
+          for (const [label,value] of [['接收时间',formatTime(item.createdAt)],['开始时间',formatTime(item.startedAt)],['结束时间',formatTime(item.finishedAt)],['排队耗时',elapsed(item.createdAt,item.startedAt || item.finishedAt)],['执行耗时',elapsed(item.startedAt,item.finishedAt)],['Token 用量',usage ? ((usage.input_tokens ?? 0)+(usage.output_tokens ?? 0)).toLocaleString() : '未报告'],['最近执行事件',lastEvent ? formatTime(lastEvent.at) : '无事件记录'],['距最近事件',lastEvent ? elapsed(lastEvent.at,item.finishedAt) : '—']]) {
+            const pair = element('div'); pair.append(element('dt','',label),element('dd','',value)); times.append(pair);
+          }
+          article.append(times);
+          if (item.stopReason && !terminal(item)) article.append(element('p','turn-note',`已请求停止：${item.stopReason}，等待执行进程退出。`));
+          if (item.error) article.append(element('p','turn-note error',`${item.error.code}: ${item.error.message}`));
+          const answer = item.result?.markdown;
+          article.append(element('h4','','Codex 返回结果'));
+          if (typeof answer === 'string' && answer.trim()) article.append(element('pre','turn-answer',answer));
+          else {
+            const missing = item.status === 'queued' ? '已接收，尚未开始执行。' : item.status === 'running' ? '正在执行，尚未产生最终结果。没有新事件不等于任务卡死。' : item.status === 'succeeded' ? '任务标记为成功，但未保存非空结果，需要检查服务端执行记录。' : '任务已结束，未保存最终结果。';
+            article.append(element('p','turn-note' + (item.status === 'succeeded' ? ' error' : ''),missing));
+          }
+          const details = element('details'); details.dataset.taskId = item.taskId;
+          details.append(element('summary','','请求 / 响应与执行事件'));
+          let populated = false;
+          const populate = () => { if (!details.open || populated) return; populated = true;
+            for (const [label,value] of [['原始请求',item.request],['任务响应',item],['最近执行事件（最多 100 条）',progress]]) details.append(element('h4','',label),element('pre','json',JSON.stringify(value ?? null,null,2)));
+          };
+          details.addEventListener('toggle',populate);
+          if (expanded.has(item.taskId)) { details.open = true; populate(); }
+          article.append(details);
+        }
+        $('turns').append(article);
+      }
+      $('conversation-count').textContent = `已加载 ${turnRows.size} / 共 ${totalTurns} 轮`;
+      $('conversation-empty').classList.toggle('hidden',turnRows.size > 0);
+      $('conversation-empty').textContent = '该会话暂无任务记录';
+      $('load-older').classList.toggle('hidden',historyOffset === 0);
+      if (focusId) {
+        const target = [...$('turns').children].find(node => node.dataset.taskId === focusId);
+        if (target) scroller.scrollTop += target.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
+      } else if (older) scroller.scrollTop = top + scroller.scrollHeight - height;
+      else if (latest || atBottom) scroller.scrollTop = scroller.scrollHeight;
+      else scroller.scrollTop = top;
       $('last-updated').textContent = '最近同步 ' + new Date().toLocaleTimeString('zh-CN',{hour12:false});
     }
-    async function loadTask(id) {
-      const item = await api('/v1/tasks/' + encodeURIComponent(id)); renderTask(item); clearTimeout(pollTimer);
-      if (!terminal(item)) pollTimer = setTimeout(() => { void loadTask(id).catch(error => message('task-message',error.message)); },1000);
-      else await refreshSessions();
+    async function readTurnDetails(entries, epoch, force = false) {
+      let index = 0;
+      // Bound detail reads so opening a long session cannot flood the service.
+      await Promise.all(Array.from({length:Math.min(4,entries.length)}, async () => {
+        while (index < entries.length && epoch === viewEpoch) {
+          const entry = entries[index++], old = turnRows.get(entry.summary.taskId);
+          if (!force && old?.data && !old.error && terminal(old.data) && old.data.status === entry.summary.status) { old.ordinal = entry.ordinal; continue; }
+          try {
+            const data = await api('/v1/tasks/' + encodeURIComponent(entry.summary.taskId));
+            if (epoch === viewEpoch) turnRows.set(data.taskId,{...entry,data});
+          } catch (error) { if (epoch === viewEpoch) turnRows.set(entry.summary.taskId,{...entry,error:error.message}); }
+        }
+      }));
+    }
+    async function refreshConversation({initial = false, older = false, focusId, force = false} = {}) {
+      const epoch = viewEpoch, id = selectedSession;
+      if (!id || refreshEpoch === epoch) return;
+      refreshEpoch = epoch; $('refresh-conversation').disabled = true; $('load-older').disabled = true;
+      try {
+        const url = '/v1/sessions/' + encodeURIComponent(id);
+        const peek = await api(url + '?offset=0&limit=1');
+        if (epoch !== viewEpoch) return;
+        const total = peek.tasks.total;
+        const offset = older ? Math.max(0,historyOffset - 20) : initial ? Math.max(0,total - 20) : Math.min(totalTurns,Math.max(0,total - 20));
+        const end = older ? historyOffset : total;
+        const entries = [];
+        for (let start = offset; start < end; start += 100) {
+          const detail = total <= 1 ? peek : await api(`${url}?offset=${start}&limit=${Math.min(100,end-start)}`);
+          if (epoch !== viewEpoch) return;
+          entries.push(...detail.tasks.items.map((summary,i) => ({summary,ordinal:start+i+1})));
+        }
+        totalTurns = total;
+        $('active-directory').textContent = peek.workingDirectory || '—';
+        if (!initial && !older) for (const old of turnRows.values()) {
+          if ((old.error || !terminal(old.data || old.summary)) && !entries.some(row => row.summary.taskId === old.summary.taskId)) entries.push({summary:old.summary,ordinal:old.ordinal});
+        }
+        await readTurnDetails(entries,epoch,force);
+        if (epoch !== viewEpoch) return;
+        historyOffset = initial ? offset : Math.min(historyOffset,offset);
+        renderConversation({older,latest:initial,focusId});
+      } catch (error) {
+        if (epoch === viewEpoch) {
+          message('task-message',error.status === 404 ? '当前实例未找到此会话。不能据此判断请求未到达，请核对服务地址、会话 ID 和调用方记录。' : '会话读取失败：' + error.message);
+          if (!turnRows.size) { $('conversation-empty').textContent = '会话记录读取失败，请重试'; $('conversation-empty').classList.remove('hidden'); }
+        }
+      } finally { if (epoch === viewEpoch) { refreshEpoch = null; $('refresh-conversation').disabled = false; $('load-older').disabled = false; } }
+    }
+    async function selectSession(id, focusId, focusData) {
+      resetTask(); selectedSession = id; $('session').value = id; $('active-session').textContent = id;
+      $('conversation-empty').textContent = '正在读取会话记录…'; markSession(); message('task-message');
+      const epoch = viewEpoch;
+      await refreshConversation({initial:true,focusId});
+      if (epoch === viewEpoch && focusData && !turnRows.has(focusId)) {
+        turnRows.set(focusId,{summary:{...focusData,question:focusData.request?.question},data:focusData,ordinal:0});
+        renderConversation({focusId});
+      }
+    }
+    async function refreshHealth() {
+      try {
+        const health = await api('/v1/health');
+        $('health-running').textContent = health.running; $('health-queued').textContent = health.queued;
+        $('health-capacity').textContent = `并发上限 ${serviceInfo?.maxConcurrent ?? '—'} · 队列上限 ${serviceInfo?.maxQueued ?? '—'}`;
+        $('health-updated').textContent = '检查于 ' + new Date().toLocaleTimeString('zh-CN',{hour12:false});
+        message('health-error',health.ready ? '' : '服务当前未就绪');
+      } catch { $('health-running').textContent = '—'; $('health-queued').textContent = '—'; message('health-error','服务状态读取失败，当前调度情况未知'); }
+    }
+    function startMonitor() {
+      clearTimeout(monitorTimer);
+      if (!taskReady || $('task-view').classList.contains('hidden') || document.hidden || !$('auto-refresh').checked) return;
+      monitorTimer = setTimeout(async () => {
+        await refreshHealth(); await refreshConversation(); startMonitor();
+      },5000);
     }
     async function refreshSessions() {
-      const data = await api('/v1/sessions?offset=0&limit=6'); $('sessions').replaceChildren();
+      const epoch = ++sessionListEpoch;
+      const data = await api(`/v1/sessions?offset=${sessionsOffset}&limit=6`);
+      if (epoch !== sessionListEpoch) return;
+      sessionsTotal = data.total; $('sessions').replaceChildren();
+      $('sessions-page').textContent = data.total ? `${sessionsOffset+1}–${sessionsOffset+data.items.length} / ${data.total}` : '共 0 个';
+      syncTaskControls();
       if (!data.items.length) { const li = document.createElement('li'); li.className = 'muted'; li.textContent = '暂无会话'; $('sessions').append(li); return; }
       for (const session of data.items) {
         const li = document.createElement('li'), button = document.createElement('button'), text = document.createElement('span'), time = document.createElement('span');
-        text.className = 'history-title'; text.textContent = session.workingDirectory || session.sessionId; time.className = 'history-time'; time.textContent = formatTime(session.createdAt); button.append(text,time); li.append(button); $('sessions').append(li);
+        button.dataset.sessionId = session.sessionId; button.disabled = submitting;
+        text.className = 'history-title mono'; text.textContent = session.sessionId; time.className = 'history-time'; time.textContent = formatTime(session.createdAt); button.append(text,time); li.append(button); $('sessions').append(li);
         button.onclick = async () => {
-          try { const detail = await api('/v1/sessions/' + encodeURIComponent(session.sessionId) + '?limit=1'); $('session').value = detail.sessionId; if (detail.tasks?.items?.length) await loadTask(detail.tasks.items.at(-1).taskId); }
-          catch (error) { message('task-message',error.message); }
+          if (!submitting) await selectSession(session.sessionId);
         };
       }
+      markSession();
     }
     async function ensureTaskConsole() {
       if (taskReady) return;
       message('task-message');
-      try { serviceInfo = await api('/v1/info'); if (serviceInfo.runner !== 'codex') throw new Error('当前服务未启用真实 Codex 执行器'); taskReady = true; await refreshSessions(); }
+      try { serviceInfo = await api('/v1/info'); if (serviceInfo.runner !== 'codex') throw new Error('当前服务未启用真实 Codex 执行器'); taskReady = true; await refreshSessions(); await refreshHealth(); startMonitor(); }
       catch (error) { message('task-message',error.message || String(error)); }
       finally { syncTaskControls(); }
     }
@@ -181,15 +352,17 @@
         await bootstrap();
         serviceInfo = await api('/v1/info');
         if (serviceInfo.runner !== 'codex') throw new Error('当前服务未启用真实 Codex 执行器');
-        taskReady = true; await refreshSessions();
+        taskReady = true; await refreshSessions(); await refreshHealth(); startMonitor();
       } catch (error) {
         serviceStatus('连接失败','error'); message('task-message',error.message || String(error));
       } finally { $('reconnect').disabled = false; syncTaskControls(); }
     }
     function showView(id) {
-      for (const name of ['account-view','task-view']) $(name).classList.toggle('hidden',name !== id);
+      for (const name of ['account-view','task-view','logs-view']) $(name).classList.toggle('hidden',name !== id);
       for (const button of document.querySelectorAll('.quick-nav button')) button.setAttribute('aria-current',button.dataset.view === id ? 'page' : 'false');
-      if (id === 'task-view') void ensureTaskConsole();
+      if (id === 'task-view') { void ensureTaskConsole(); startMonitor(); }
+      else clearTimeout(monitorTimer);
+      if (id === 'logs-view') void loadInvocationPanel();
     }
     $('task-form').onsubmit = async event => {
       event.preventDefault(); if (!taskReady || submitting) return;
@@ -197,23 +370,43 @@
       message('task-message'); const request = {question:$('question').value,idempotencyKey:crypto.randomUUID()}; const rawContext = $('context').value.trim();
       if (rawContext) { try { const value = JSON.parse(rawContext); if (!value || Array.isArray(value) || typeof value !== 'object') throw new Error(); request.context = value; } catch { message('task-message','附加上下文必须是有效的 JSON 对象。'); return; } }
       if ($('session').value.trim()) request.sessionId = $('session').value.trim();
-      submitting = true; syncTaskControls(); $('request-json').textContent = JSON.stringify(request,null,2);
-      try { const item = await api('/v1/tasks',{method:'POST',body:JSON.stringify(request)}); $('session').value = item.sessionId; renderTask(item); await loadTask(item.taskId); }
-      catch (error) { message('task-message',error.message || String(error)); }
+      submitting = true; syncTaskControls();
+      let accepted;
+      try {
+        accepted = await api('/v1/tasks',{method:'POST',body:JSON.stringify(request)});
+        $('session').value = accepted.sessionId; $('question').value = ''; $('context').value = '';
+        if (selectedSession !== accepted.sessionId) await selectSession(accepted.sessionId,accepted.taskId,accepted);
+        else { await refreshConversation({focusId:accepted.taskId}); }
+        sessionsOffset = 0; await refreshSessions(); await refreshHealth(); startMonitor();
+      }
+      catch (error) {
+        message('task-message',accepted ? `任务已接收：${accepted.taskId}，但页面同步失败，请按任务 ID 查询。` : error.status && error.status < 500 ? `服务拒绝提交：${error.message}` : `提交结果未知：${error.message}。请核对调用方记录，勿直接重复提交。幂等键：${request.idempotencyKey}`);
+      }
       finally { submitting = false; syncTaskControls(); }
     };
     $('question').oninput = syncTaskControls;
     $('new-session').onclick = () => { $('session').value = ''; $('question').value = ''; $('context').value = ''; resetTask(); syncTaskControls(); $('question').focus(); };
     $('refresh-sessions').onclick = () => { void refreshSessions().catch(error => message('task-message',error.message)); };
+    for (const [id,step] of [['session-prev',-6],['session-next',6]]) $(id).onclick = () => { sessionsOffset = Math.max(0,sessionsOffset+step); void refreshSessions().catch(error => message('task-message',error.message)); };
+    $('load-older').onclick = () => { void refreshConversation({older:true}); };
+    $('refresh-conversation').onclick = () => { message('task-message'); void refreshConversation({force:true}); void refreshHealth(); };
+    $('auto-refresh').onchange = startMonitor;
+    document.addEventListener('visibilitychange',startMonitor);
+    $('task-lookup').onsubmit = async event => {
+      event.preventDefault(); if (submitting || !taskReady) return;
+      const id = $('lookup-id').value.trim();
+      if (!/^(task|sess)_[0-9a-f-]{36}$/.test(id)) { message('task-message','请输入完整的 task_ 或 sess_ ID'); return; }
+      if (id.startsWith('sess_')) { await selectSession(id); return; }
+      resetTask(); const epoch = viewEpoch; message('task-message');
+      try { const item = await api('/v1/tasks/' + encodeURIComponent(id)); if (epoch === viewEpoch) await selectSession(item.sessionId,item.taskId,item); }
+      catch (error) { if (epoch === viewEpoch) message('task-message',error.status === 404 ? '当前实例未找到此任务。不能据此判断请求未到达，请核对服务地址、任务 ID、鉴权和调用方记录。' : '任务读取失败：' + error.message); }
+    };
     $('refresh-account').onclick = () => { void loadAccount(true); };
     $('reconnect').onclick = () => { void reconnectTaskConsole(); };
     for (const button of document.querySelectorAll('.quick-nav button')) button.onclick = () => showView(button.dataset.view);
-    for (const tab of document.querySelectorAll('.detail-tab')) tab.onclick = () => {
-      for (const item of document.querySelectorAll('.detail-tab')) { const selected = item === tab; item.setAttribute('aria-selected',String(selected)); $(item.dataset.pane).classList.toggle('hidden',!selected); }
-    };
     $('endpoint').value = location.origin;
     if (location.protocol === 'file:') { serviceStatus('打开方式错误','error'); message('account-message','请通过 CodexRelay 服务地址打开此页面。'); }
-    else void (async () => { try { await bootstrap(); await loadAccount(); } catch (error) { serviceStatus('连接失败','error'); message('account-message',error.message || String(error)); } })();
+    else void (async () => { try { await bootstrap(); await loadAccount(); } catch (error) { serviceStatus('连接失败','error'); renderAccount({available:false,authenticated:false}); message('account-message',error.message || String(error)); } })();
     syncTaskControls();
   </script>
 </body>

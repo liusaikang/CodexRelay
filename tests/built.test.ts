@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { mkdtemp, rm, writeFile, access } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile, access, readFile } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { tmpdir } from 'node:os';
@@ -32,6 +32,7 @@ it('runs the compiled stdio entry point through the official MCP transport', asy
   await writeFile(file, stringify({
     dataDir: join(dir, 'state'), codex: { home: join(dir, 'home'), defaultWorkingDirectory: dir },
     tasks: { maxConcurrent: 1, maxQueued: 2 }, runner: 'demo',
+    invocationLog: { enabled: true, directory: join(dir, 'logs') },
   }));
   const client = new Client({ name: 'stdio-test', version: '1.0.0' });
   const transport = new StdioClientTransport({ command: process.execPath, args: [resolve('dist/main.js'), '--transport', 'stdio', '--config', file], stderr: 'pipe' });
@@ -43,6 +44,8 @@ it('runs the compiled stdio entry point through the official MCP transport', asy
     await new Promise(r => setTimeout(r, 400));
     const finished = await client.callTool({ name: 'codex_get_task', arguments: { taskId: task.taskId } });
     expect((finished.structuredContent as any).data.status).toBe('succeeded');
+    const stored = JSON.parse(await readFile(join(dir, 'logs', task.createdAt.slice(0, 10), `${task.taskId}.json`), 'utf8'));
+    expect(stored).toMatchObject({ transport: 'stdio', status: 'succeeded', question: 'hello' });
   } finally { await client.close(); await rm(dir, { recursive: true, force: true }); }
 });
 

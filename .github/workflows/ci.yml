@@ -4,7 +4,7 @@ jobs:
   test:
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
         node: [22, 24]
     runs-on: ${{ matrix.os }}
     steps:
@@ -16,3 +16,5 @@ jobs:
       - run: npm ci
       - run: npm run verify
       - run: npm run release:check
+      - run: npx playwright install --with-deps chromium
+      - run: npm run smoke:browser

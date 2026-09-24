@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { mkdtemp, writeFile, readFile, realpath, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, realpath, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { parse, stringify } from 'yaml';
@@ -10,7 +10,39 @@ it('loads native Codex defaults without importing skill or prompt contents', asy
   expect(config.defaultWorkingDirectory).toBe(await realpath('examples/workspace'));
   expect(config).not.toHaveProperty('capabilities');
   expect(config).not.toHaveProperty('projects');
+  expect(config.invocationLog).toMatchObject({ enabled: false, retentionDays: 30 });
   expect(config.maxConcurrent).toBe(parse(await readFile('config/default.yaml', 'utf8')).tasks.maxConcurrent);
+});
+
+it('validates invocation retention and keeps its directory separate from runtime state', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'relay-log-config-'));
+  try {
+    const file = join(dir, 'config.yaml');
+    const base = { dataDir: './state', codex: { home: './home', defaultWorkingDirectory: '.' } };
+    await writeFile(file, stringify({ ...base, invocationLog: { enabled: true, directory: './logs', retentionDays: 7 } }));
+    expect((await loadConfig(file)).invocationLog).toEqual({ enabled: true, directory: join(dir, 'logs'), retentionDays: 7 });
+    for (const invocationLog of [{ retentionDays: 0 }, { enabled: 'true' }, { directory: './state/tasks' }, { directory: './home' }, { directory: '.' }]) {
+      await writeFile(file, stringify({ ...base, invocationLog: { enabled: true, ...invocationLog } }));
+      await expect(loadConfig(file)).rejects.toThrow();
+    }
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+it('checks real storage locations through linked parents and dot-prefixed children', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'relay-log-paths-'));
+  try {
+    const file = join(dir, 'config.yaml');
+    const state = join(dir, 'state');
+    await mkdir(state);
+    await symlink(state, join(dir, 'alias'), process.platform === 'win32' ? 'junction' : 'dir');
+    const base = { dataDir: './state', codex: { home: './home', defaultWorkingDirectory: '.' } };
+    for (const directory of ['./alias/logs', './state/..logs']) {
+      await writeFile(file, stringify({ ...base, invocationLog: { enabled: true, directory } }));
+      await expect(loadConfig(file)).rejects.toThrow('must be separate');
+    }
+    await writeFile(file, stringify({ ...base, invocationLog: { enabled: true, directory: './..logs' } }));
+    await expect(loadConfig(file)).resolves.toMatchObject({ invocationLog: { enabled: true } });
+  } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
 it('expands environment variables in runtime paths without hardcoding local secrets', async () => {
