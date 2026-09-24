@@ -10,6 +10,7 @@ import { TaskService } from '../src/service.js';
 import { FileStore } from '../src/storage.js';
 import { DemoRunner } from '../src/runner/demo.js';
 import { createHttpApp } from '../src/api/http.js';
+import type { AccountStatusProvider } from '../src/account.js';
 
 let dir: string;
 let service: TaskService;
@@ -17,15 +18,34 @@ let server: Server;
 let base: string;
 const token = 'test-token-with-at-least-24-characters';
 const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+const accountStatus: AccountStatusProvider = {
+  read: async force => ({
+    available: true, authenticated: true, method: 'chatgpt', plan: 'pro', email: 'o******r@example.com',
+    checkedAt: '2026-09-24T08:00:00.000Z',
+    quota: { ordinaryUsageAllowed: true, primary: { usedPercent: force ? 41 : 40, remainingPercent: force ? 59 : 60, windowDurationMins: 10080, resetsAt: '2026-09-30T00:00:00.000Z' }, secondary: null },
+    credits: { hasCredits: false, unlimited: false, balance: '0', availableResetCount: 2 },
+    tokenUsage: { lifetimeTokens: 1000, peakDailyTokens: 500, longestRunningTurnSec: 20, currentStreakDays: 2, longestStreakDays: 3, daily: [] },
+  }),
+};
 beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), 'codex-api-'));
   const config = await loadConfig(resolve('config/demo.yaml'));
   config.dataDir = dir;
   service = new TaskService(config, new FileStore(dir), new DemoRunner());
   await service.init();
-  server = createHttpApp(service, token).listen(0, '127.0.0.1');
+  server = createHttpApp(service, token, accountStatus).listen(0, '127.0.0.1');
   await new Promise<void>(r => server.once('listening', r));
   base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+});
+
+it('serves protected account status and supports a forced refresh', async () => {
+  expect((await fetch(`${base}/v1/admin/account`)).status).toBe(401);
+  const account = await (await fetch(`${base}/v1/admin/account`, { headers })).json();
+  expect(account).toMatchObject({
+    authenticated: true, plan: 'pro', quota: { primary: { remainingPercent: 60 } },
+  });
+  const refreshed = await (await fetch(`${base}/v1/admin/account/refresh`, { method: 'POST', headers, body: '{}' })).json();
+  expect(refreshed.quota.primary.remainingPercent).toBe(59);
 });
 afterEach(async () => {
   await service.close();
@@ -61,7 +81,8 @@ it('serves a token-free console and accepts authenticated same-origin browser su
   expect(page.status).toBe(200);
   expect(page.headers.get('content-type')).toContain('text/html');
   const html = await page.text();
-  expect(html).toContain('CodexMCP');
+  expect(html).toContain('CodexRelay');
+  expect(html).toContain('账号额度');
   expect(html).not.toContain(token);
   const session = await fetch(`${base}/console/session`);
   expect(session.status).toBe(200);

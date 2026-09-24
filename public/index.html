@@ -3,249 +3,218 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>CodexMCP · API 控制台</title>
+  <title>CodexRelay · 控制台</title>
   <style>
-    :root{color-scheme:light;--ink:#252b2a;--muted:#737d78;--line:#dfe5e1;--green:#08775c;--soft:#eaf5ef;--surface:#f6f8f7;--red:#b23535}
-    *{box-sizing:border-box;letter-spacing:0}body{margin:0;font:14px/1.6 "Segoe UI","Microsoft YaHei",sans-serif;color:var(--ink);background:white}
-    button,input,textarea,select{font:inherit}button{cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:38px;border:1px solid var(--line);border-radius:5px;background:white;padding:7px 13px;color:var(--ink);white-space:nowrap}
-    button:hover:not(:disabled){background:var(--surface);border-color:#a6b9af}button:disabled{opacity:.42;cursor:not-allowed}button.primary{background:var(--green);border-color:var(--green);color:white}button.primary:hover:not(:disabled){background:#05624c}button.icon{width:36px;min-width:36px;padding:7px}button svg{width:16px;height:16px;flex-shrink:0}
-    input,textarea,select{width:100%;min-width:0;border:1px solid #cfd8d2;border-radius:5px;background:white;color:var(--ink);padding:9px 11px}input,select{height:40px}input[readonly]{background:var(--surface);color:var(--muted)}textarea{resize:vertical;min-height:150px}input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid #69af96;outline-offset:2px}
-    label{display:block;font-size:12px;font-weight:600;margin-bottom:6px;color:#52615a}.mono,pre,code{font-family:Consolas,"SFMono-Regular",monospace}.muted{color:var(--muted)}.row{display:flex;align-items:center;gap:10px}.grow{flex:1;min-width:0}.hidden{display:none!important}
-    header{height:76px;padding:0 32px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:15px}.brand{display:flex;align-items:center;gap:12px}.mark{width:36px;height:36px;background:var(--green);color:white;border-radius:6px;display:grid;place-items:center}.mark svg{width:22px;height:22px}h1{font-size:22px;line-height:1.2;margin:0;font-weight:650}.subtitle{font-size:12px;color:var(--muted)}.badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#516259;padding:4px 8px;background:var(--surface);border:1px solid var(--line);border-radius:4px;white-space:nowrap}.dot{width:7px;height:7px;border-radius:50%;background:#a2aaa6}.online .dot{background:#16a372}.online{background:var(--soft);color:var(--green);border-color:#c5e4d5}
-    .connection{padding:20px 32px;background:var(--surface);border-bottom:1px solid var(--line);display:grid;grid-template-columns:minmax(170px,.8fr) minmax(220px,1.3fr) auto;gap:18px;align-items:end}.connection .actions{display:flex;gap:8px}.connection input{background:#fff}.alert{margin:16px 32px 0;padding:10px 14px;background:#fff2f1;border:1px solid #efd0cc;border-radius:4px;color:var(--red);overflow-wrap:anywhere}
-    main{max-width:1560px;margin:0 auto;display:grid;grid-template-columns:360px minmax(0,1fr)}aside{border-right:1px solid var(--line);min-width:0}.compose{padding:26px 24px}.section-heading{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;gap:12px}h2{font-size:16px;margin:0;font-weight:650}.eyebrow{font-size:11px;color:var(--muted)}.field{margin-bottom:18px}.field-pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}.optional{font-weight:400;color:var(--muted)}.field-help{font-size:12px;color:var(--muted);margin-top:7px;line-height:1.5}#submit{width:100%;margin-top:2px;height:42px}.session-line{display:flex;align-items:center;gap:8px}.session-line input{font-size:12px}
-    .history{padding:22px 24px;border-top:1px solid var(--line)}.history .section-heading{margin-bottom:10px}.history-list{list-style:none;margin:0;padding:0}.history-list li{border-bottom:1px solid #edf0ee}.history-list button{border:0;border-radius:0;width:100%;padding:11px 0;display:block;text-align:left;white-space:normal;background:transparent}.history-list button:hover:not(:disabled){background:var(--surface)}.history-title{font-size:13px;overflow-wrap:anywhere}.history-meta{font-size:11px;color:var(--muted);display:flex;justify-content:space-between;gap:5px}.pagination{margin-top:14px;display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--muted)}
-    .workspace{padding:26px 30px;min-width:0}.workspace .section-heading{margin-bottom:16px}.task-tools{display:flex;align-items:center;gap:8px}.status{border-radius:4px;background:var(--surface);padding:4px 9px;font-size:12px;color:var(--muted);display:inline-block}.status[data-state=succeeded]{background:#e4f4ec;color:#06734e}.status[data-state=running],.status[data-state=queued]{background:#edf1ff;color:#405e9e}.status[data-state=failed],.status[data-state=timed_out]{background:#fdeceb;color:#a63333}.stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;padding:17px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.stat-title{font-size:11px;color:var(--muted)}.stat-value{font-size:14px;margin-top:3px;overflow-wrap:anywhere}.meta{margin:16px 0;display:grid;grid-template-columns:64px minmax(0,1fr);gap:6px 12px;font-size:12px}.meta dt{color:var(--muted)}.meta dd{margin:0;overflow-wrap:anywhere}
-    .tabs{display:flex;gap:22px;border-bottom:1px solid var(--line);margin-top:24px}.tab{border:0;border-radius:0;border-bottom:2px solid transparent;background:transparent!important;padding:10px 0;color:var(--muted)}.tab[aria-selected=true]{border-bottom-color:var(--green);color:var(--green);font-weight:600}.pane{padding-top:20px;min-height:300px}.result{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;line-height:1.9;margin:0;font-family:inherit}.empty{min-height:260px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:#8b9890}.empty svg{width:34px;height:34px;color:#a8b8af}.empty p{margin:0}.empty small{font-size:12px}.json{padding:18px;background:#f5f7f6;border:1px solid var(--line);border-radius:5px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;max-height:520px;overflow-y:auto;margin:10px 0 20px}.events{list-style:none;margin:0;padding:0}.events li{display:grid;grid-template-columns:78px minmax(0,1fr);gap:14px;padding:10px 0;border-bottom:1px solid #eef1ef;font-size:12px;overflow-wrap:anywhere}.events time{color:var(--muted)}.query{display:flex;gap:8px;max-width:620px;margin-bottom:20px}.query input{font-size:12px}.result-toolbar{justify-content:space-between;margin-bottom:16px}.result-toolbar span{font-size:12px;color:var(--muted)}footer{padding:16px 32px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:12px;color:var(--muted);font-size:11px}.counts{font-size:12px;color:var(--muted)}
-    @media(min-width:1500px){main{grid-template-columns:400px minmax(0,1fr)}}@media(max-width:900px){header{padding:0 20px}.connection{padding:18px 20px;grid-template-columns:1fr 1fr}.connection .actions{grid-column:1/-1;justify-content:flex-end}main{grid-template-columns:310px minmax(0,1fr)}.workspace{padding:24px 20px}.compose,.history{padding:22px 18px}.counts{display:none}}
-    @media(max-width:680px){header{height:68px;padding:0 16px}h1{font-size:19px}.connection{padding:16px;grid-template-columns:1fr;gap:12px}.connection .actions{grid-column:auto}.connection .actions button{flex:1}main{display:flex;flex-direction:column}aside{border-right:0}.compose{padding:24px 16px;border-bottom:1px solid var(--line)}.history{padding:18px 16px}.workspace{padding:22px 16px;border-top:1px solid var(--line)}.stats{gap:12px}.stat-value{font-size:13px}.alert{margin:12px 16px 0}footer{padding:16px;flex-wrap:wrap}.query{flex-wrap:wrap}.query input{flex-basis:100%}.tabs{gap:20px}.workspace .section-heading{flex-wrap:wrap}}
+    :root{color-scheme:light;--ink:#252b2a;--muted:#707a75;--line:#dfe5e1;--green:#08775c;--green-dark:#05624c;--soft:#eaf5ef;--surface:#f6f8f7;--red:#a93a38;--blue:#405e9e}
+    *{box-sizing:border-box;letter-spacing:0}
+    body{margin:0;min-height:100vh;font:14px/1.6 "Segoe UI","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--surface)}
+    button,input,textarea{font:inherit}button{cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:38px;border:1px solid var(--line);border-radius:6px;background:white;padding:7px 13px;color:var(--ink);white-space:nowrap}
+    button:hover:not(:disabled){border-color:#9eb6ab;background:#fbfcfb}button:disabled{opacity:.45;cursor:not-allowed}button.primary{background:var(--green);border-color:var(--green);color:white}button.primary:hover:not(:disabled){background:var(--green-dark)}button.icon{width:36px;min-width:36px;padding:7px}button svg{width:16px;height:16px;flex-shrink:0}
+    input,textarea{width:100%;min-width:0;border:1px solid #cfd8d2;border-radius:6px;background:white;color:var(--ink);padding:9px 11px}input{height:40px}textarea{min-height:132px;resize:vertical}input:focus,textarea:focus,button:focus-visible{outline:2px solid #69af96;outline-offset:2px}
+    label{display:block;font-size:12px;font-weight:600;margin-bottom:6px;color:#52615a}.mono,pre,code{font-family:Consolas,"SFMono-Regular",monospace}.hidden{display:none!important}.muted{color:var(--muted)}.row{display:flex;align-items:center;gap:9px}
+    header{height:72px;padding:0 32px;border-bottom:1px solid var(--line);background:white;display:flex;align-items:center;justify-content:space-between;gap:16px}.brand{display:flex;align-items:center;gap:12px}.mark{width:36px;height:36px;border-radius:6px;background:var(--green);color:white;display:grid;place-items:center}.mark svg{width:21px;height:21px}h1{font-size:21px;line-height:1.15;margin:0;font-weight:650}.subtitle{font-size:12px;color:var(--muted)}
+    .service-status{display:inline-flex;align-items:center;gap:7px;padding:5px 9px;border:1px solid var(--line);border-radius:5px;background:var(--surface);font-size:12px;color:var(--muted)}.status-dot{width:7px;height:7px;border-radius:50%;background:#a3aaa7}.service-status.online{color:var(--green);background:var(--soft);border-color:#c5e4d5}.service-status.online .status-dot{background:#16a372}.service-status.error{color:var(--red);background:#fff2f1;border-color:#efd0cc}.service-status.error .status-dot{background:var(--red)}
+    .quick-nav{height:52px;padding:0 32px;border-bottom:1px solid var(--line);background:white;display:flex;align-items:stretch;gap:25px}.quick-nav button{min-height:0;padding:0 2px;border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent!important;color:var(--muted)}.quick-nav button[aria-current=page]{color:var(--green);border-bottom-color:var(--green);font-weight:650}
+    .view{min-height:calc(100vh - 160px)}.account-shell{width:min(760px,calc(100% - 32px));margin:48px auto;padding-bottom:44px}.page-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:20px}.page-heading h2{font-size:22px;line-height:1.3;margin:0;font-weight:650}.page-heading p{margin:5px 0 0;color:var(--muted);font-size:13px}
+    .account-panel{background:white;border:1px solid var(--line);border-radius:8px;padding:26px}.identity{display:grid;grid-template-columns:auto minmax(0,1fr);gap:16px;align-items:center;padding-bottom:24px;border-bottom:1px solid var(--line)}.avatar{width:50px;height:50px;border-radius:7px;border:1px solid #b9d9cc;background:var(--soft);color:var(--green);display:grid;place-items:center}.avatar svg{width:24px;height:24px}.account{font-size:17px;font-weight:650;overflow-wrap:anywhere}.account-meta{margin-top:2px;color:var(--muted);font-size:12px}.plan{display:inline-flex;margin-left:7px;padding:1px 7px;border-radius:4px;background:#e7eefc;color:#345d9d;font-size:11px;text-transform:uppercase;vertical-align:2px}
+    .quota{padding-top:25px}.quota-title{display:flex;justify-content:space-between;align-items:baseline;gap:14px}.quota-title span{font-weight:600}.quota-title strong{font-size:24px;color:var(--green);font-weight:650}.track{height:12px;margin-top:12px;background:#e7ece9;border-radius:4px;overflow:hidden}.bar{height:100%;width:0;background:var(--green);transition:width .3s ease}.quota-details{display:flex;justify-content:space-between;gap:15px;margin-top:9px;font-size:12px;color:var(--muted)}.facts{display:grid;grid-template-columns:1fr 1fr;margin-top:25px;border:1px solid var(--line);border-radius:6px;overflow:hidden}.fact{padding:15px 17px;background:var(--surface)}.fact+.fact{border-left:1px solid var(--line)}.fact-label{font-size:11px;color:var(--muted)}.fact-value{margin-top:3px;font-size:14px;font-weight:600}.secondary{margin-top:20px;padding-top:20px;border-top:1px solid var(--line)}.secondary .quota-title strong{font-size:17px}.secondary .track{height:8px}
+    .message{margin:14px 32px 0;padding:11px 14px;border:1px solid #efd0cc;border-radius:6px;background:#fff2f1;color:var(--red);font-size:12px;overflow-wrap:anywhere}.account-shell .message{margin:14px 0 0}
+    .connection-strip{max-width:1560px;margin:0 auto;padding:18px 24px;border-bottom:1px solid var(--line);background:white;display:grid;grid-template-columns:minmax(190px,.75fr) minmax(280px,1.25fr) auto;gap:16px;align-items:end}.connection-strip .field{margin:0}.connection-strip input{background:var(--surface);color:#52615a}.connection-strip button{height:40px}
+    .task-shell{max-width:1560px;margin:0 auto;background:white;display:grid;grid-template-columns:370px minmax(0,1fr)}.task-sidebar{border-right:1px solid var(--line);min-width:0}.compose,.history{padding:25px 24px}.history{border-top:1px solid var(--line)}.section-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:17px}.section-heading h2{font-size:16px;margin:0}.eyebrow{font-size:11px;color:var(--muted)}.field{margin-bottom:17px}.optional,.field-help{font-weight:400;color:var(--muted)}.field-help{font-size:11px;margin-top:6px}.session-line{display:flex;gap:8px}.submit{width:100%;height:42px}
+    .history-list{list-style:none;margin:0;padding:0}.history-list li{border-bottom:1px solid #edf0ee}.history-list button{width:100%;border:0;border-radius:0;padding:10px 0;text-align:left;justify-content:flex-start;background:transparent;white-space:normal}.history-title{font-size:12px;overflow-wrap:anywhere}.history-time{display:block;font-size:10px;color:var(--muted)}
+    .workspace{padding:26px 30px;min-width:0}.task-status{display:inline-block;padding:4px 9px;border-radius:4px;background:var(--surface);font-size:12px;color:var(--muted)}.task-status[data-state=succeeded]{background:#e4f4ec;color:#06734e}.task-status[data-state=running],.task-status[data-state=queued]{background:#edf1ff;color:var(--blue)}.task-status[data-state=failed],.task-status[data-state=timed_out]{background:#fdeceb;color:var(--red)}.task-id{font-size:12px;color:var(--muted);overflow-wrap:anywhere}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;padding:17px 0;margin-top:16px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.stat-label{font-size:11px;color:var(--muted)}.stat-value{margin-top:3px}.meta{display:grid;grid-template-columns:70px minmax(0,1fr);gap:7px 12px;margin:16px 0;font-size:12px}.meta dt{color:var(--muted)}.meta dd{margin:0;overflow-wrap:anywhere}
+    .detail-tabs{display:flex;gap:22px;border-bottom:1px solid var(--line);margin-top:21px}.detail-tab{border:0;border-radius:0;border-bottom:2px solid transparent;background:transparent!important;padding:10px 0;color:var(--muted)}.detail-tab[aria-selected=true]{border-bottom-color:var(--green);color:var(--green);font-weight:600}.detail-pane{padding-top:18px;min-height:290px}.result{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font:14px/1.9 "Segoe UI","Microsoft YaHei",sans-serif}.empty{min-height:250px;display:grid;place-items:center;color:#8b9890}.json{padding:16px;background:var(--surface);border:1px solid var(--line);border-radius:6px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;max-height:460px;overflow:auto}
+    footer{padding:15px 32px;border-top:1px solid var(--line);background:white;display:flex;justify-content:space-between;gap:12px;color:var(--muted);font-size:11px}
+    @media(max-width:900px){header,.quick-nav{padding-left:20px;padding-right:20px}.task-shell{grid-template-columns:320px minmax(0,1fr)}.compose,.history{padding:22px 18px}.workspace{padding:24px 20px}}
+    @media(max-width:680px){header{height:66px;padding:0 16px}.subtitle{display:none}h1{font-size:18px}.quick-nav{height:48px;padding:0 16px;gap:20px}.view{min-height:calc(100vh - 151px)}.account-shell{margin:28px auto;width:min(100% - 24px,760px)}.page-heading{flex-direction:column;align-items:stretch}.page-heading button{align-self:flex-start}.account-panel{padding:20px}.facts{grid-template-columns:1fr}.fact+.fact{border-left:0;border-top:1px solid var(--line)}.quota-details{flex-direction:column;gap:2px}.connection-strip{grid-template-columns:1fr;padding:16px}.task-shell{display:flex;flex-direction:column}.task-sidebar{border-right:0}.workspace{border-top:1px solid var(--line);padding:22px 16px}.compose,.history{padding:22px 16px}.stats{gap:10px}.detail-tabs{gap:17px}.message{margin:12px 16px 0}footer{padding:14px 16px;flex-direction:column}}
   </style>
   <script src="/assets/lucide.js"></script>
 </head>
 <body>
   <header>
-    <div class="brand"><div class="mark"><i data-lucide="terminal"></i></div><div><h1>CodexMCP</h1><span class="subtitle">API 控制台</span></div></div>
-    <div class="row"><span class="counts" id="counts">运行 0 · 排队 0</span><span class="badge" id="connection-status"><span class="dot"></span><span id="connection-label">未连接</span></span></div>
+    <div class="brand"><div class="mark"><i data-lucide="waypoints"></i></div><div><h1>CodexRelay</h1><span class="subtitle">Codex 服务控制台</span></div></div>
+    <div id="service-status" class="service-status"><span class="status-dot"></span><span id="service-label">正在连接</span></div>
   </header>
-  <form class="connection" id="connection-form">
-    <div><label for="endpoint">服务地址</label><input id="endpoint" class="mono" readonly></div>
-    <div><label for="auth-source">访问令牌</label><input id="auth-source" readonly value="由服务环境变量 CODEX_MCP_TOKEN 自动提供"></div>
-    <div class="actions"><button type="submit" id="connect" class="primary"><i data-lucide="plug"></i>连接服务</button></div>
-  </form>
-  <div id="alert" class="alert hidden" role="alert"></div>
-  <main>
-    <aside>
-      <form id="task-form" class="compose">
-        <div class="section-heading"><h2>提交问题</h2><span class="eyebrow">POST /v1/tasks</span></div>
-        <div class="field"><label for="question">问题内容</label><textarea id="question" maxlength="32000" required placeholder="请描述需要 Codex 分析或处理的问题。" disabled></textarea></div>
-        <div class="field"><label for="context">附加上下文 JSON <span class="optional">· 可选</span></label><textarea id="context" class="mono" maxlength="16384" placeholder='{"subject":{"account":"demo-user","tenantId":"tenant-demo-001"}}' disabled></textarea><div class="field-help">由调用平台提供的结构化参考数据，最大 16 KiB。</div></div>
-        <div class="field"><label for="session">会话 ID <span class="optional">· 可选</span></label><div class="session-line"><input id="session" class="mono" placeholder="留空创建新会话" disabled><button type="button" id="new-session" class="icon" title="新建会话" aria-label="新建会话" disabled><i data-lucide="plus"></i></button></div><div id="session-notice" class="field-help hidden" role="status"></div></div>
-        <button type="submit" class="primary" id="submit" disabled><i data-lucide="send"></i><span id="submit-label">提交任务</span></button>
-      </form>
-      <section class="history"><div class="section-heading"><h2>最近会话</h2><button id="refresh-sessions" class="icon" title="刷新会话" aria-label="刷新会话" disabled><i data-lucide="refresh-cw"></i></button></div><ul class="history-list" id="sessions"><li class="muted">暂无会话</li></ul><div class="pagination"><span id="session-count">0 个会话</span><div class="row"><button id="prev-page" class="icon" title="上一页" aria-label="上一页" disabled><i data-lucide="chevron-left"></i></button><button id="next-page" class="icon" title="下一页" aria-label="下一页" disabled><i data-lucide="chevron-right"></i></button></div></div></section>
-    </aside>
-    <section class="workspace">
-      <div class="section-heading"><div class="row"><h2>执行记录</h2><span class="status" id="task-status">尚未提交</span></div><div class="task-tools"><button id="refresh-task" class="icon" title="刷新任务" aria-label="刷新任务" disabled><i data-lucide="refresh-cw"></i></button><button id="cancel" disabled><i data-lucide="square"></i>取消任务</button></div></div>
-      <div class="query"><input id="task-id" class="mono" aria-label="任务 ID" placeholder="task_…" disabled><button id="lookup" disabled><i data-lucide="search"></i>查询任务</button></div>
-      <div class="stats"><div><div class="stat-title">创建时间</div><div class="stat-value" id="created">—</div></div><div><div class="stat-title">执行耗时</div><div class="stat-value" id="duration">—</div></div><div><div class="stat-title">Token 用量</div><div class="stat-value" id="usage">—</div></div></div>
-      <dl class="meta"><dt>会话</dt><dd id="active-session" class="mono">—</dd><dt>工作目录</dt><dd id="active-directory" class="mono">—</dd></dl>
-      <div class="tabs" role="tablist" aria-label="执行详情"><button class="tab" role="tab" aria-selected="true" aria-controls="result-pane" id="result-tab">分析结果</button><button class="tab" role="tab" aria-selected="false" aria-controls="payload-pane" id="payload-tab">请求 / 响应</button><button class="tab" role="tab" aria-selected="false" aria-controls="events-pane" id="events-tab">执行事件</button></div>
-      <section id="result-pane" class="pane" role="tabpanel" aria-labelledby="result-tab"><div class="result-toolbar row"><span id="result-caption">等待任务</span><button id="copy" class="icon" title="复制结果" aria-label="复制结果" disabled><i data-lucide="copy"></i></button></div><div id="empty" class="empty"><i data-lucide="messages-square"></i><p>暂无分析结果</p></div><pre id="result" class="result hidden" aria-live="polite"></pre></section>
-      <section id="payload-pane" class="pane hidden" role="tabpanel" aria-labelledby="payload-tab"><label>请求体</label><pre class="json" id="request-json">{}</pre><label>响应体</label><pre class="json" id="response-json">{}</pre></section>
-      <section id="events-pane" class="pane hidden" role="tabpanel" aria-labelledby="events-tab"><ul class="events" id="events"><li class="muted">暂无事件</li></ul></section>
+  <nav class="quick-nav" aria-label="快捷栏">
+    <button type="button" data-view="account-view" aria-current="page"><i data-lucide="gauge"></i>账号额度</button>
+    <button type="button" data-view="task-view" aria-current="false"><i data-lucide="messages-square"></i>Codex 调用</button>
+  </nav>
+
+  <section id="account-view" class="view">
+    <main class="account-shell">
+      <div class="page-heading"><div><h2>当前 Codex 账号</h2><p>查看服务使用的登录账号和实时剩余额度。</p></div><button type="button" id="refresh-account" disabled><i data-lucide="refresh-cw"></i>刷新</button></div>
+      <section class="account-panel">
+        <div class="identity"><div class="avatar"><i data-lucide="user-round"></i></div><div><div class="account"><span id="account">读取中…</span><span id="plan" class="plan hidden"></span></div><div id="login-method" class="account-meta">正在检查 Codex 登录状态</div></div></div>
+        <div class="quota"><div class="quota-title"><span>主要额度窗口</span><strong id="remaining">—</strong></div><div class="track" role="progressbar" aria-label="主要额度剩余" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="remaining-bar" class="bar"></div></div><div class="quota-details"><span id="used">已使用 —</span><span id="reset">重置时间 —</span></div></div>
+        <div id="secondary" class="secondary hidden"><div class="quota-title"><span>次要额度窗口</span><strong id="secondary-remaining">—</strong></div><div class="track" role="progressbar" aria-label="次要额度剩余" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="secondary-bar" class="bar"></div></div><div class="quota-details"><span id="secondary-used">已使用 —</span><span id="secondary-reset">重置时间 —</span></div></div>
+        <div class="facts"><div class="fact"><div class="fact-label">可用重置次数</div><div id="reset-credits" class="fact-value">—</div></div><div class="fact"><div class="fact-label">最近检查</div><div id="checked-at" class="fact-value">—</div></div></div>
+      </section>
+      <div id="account-message" class="message hidden" role="alert"></div>
+    </main>
+  </section>
+
+  <section id="task-view" class="view hidden">
+    <section class="connection-strip" aria-label="Codex 服务连接">
+      <div class="field"><label for="endpoint">服务地址</label><input id="endpoint" class="mono" readonly></div>
+      <div class="field"><label for="auth-source">认证来源</label><input id="auth-source" value="由服务环境变量 CODEX_MCP_TOKEN 自动提供" readonly></div>
+      <button type="button" id="reconnect"><i data-lucide="plug-zap"></i>重新连接</button>
     </section>
-  </main>
-  <footer><span>CodexMCP / HTTP API</span><span id="last-updated">尚未同步</span></footer>
+    <div id="task-message" class="message hidden" role="alert"></div>
+    <main class="task-shell">
+      <aside class="task-sidebar">
+        <form id="task-form" class="compose">
+          <div class="section-heading"><h2>提交问题</h2><span class="eyebrow">POST /v1/tasks</span></div>
+          <div class="field"><label for="question">问题内容</label><textarea id="question" maxlength="32000" placeholder="请描述需要 Codex 分析或处理的问题。" disabled></textarea></div>
+          <div class="field"><label for="context">附加上下文 JSON <span class="optional">· 可选</span></label><textarea id="context" class="mono" maxlength="16384" placeholder='{"subject":{"account":"demo-user"}}' disabled></textarea><div class="field-help">由调用平台提供的结构化参考数据，最大 16 KiB。</div></div>
+          <div class="field"><label for="session">会话 ID <span class="optional">· 可选</span></label><div class="session-line"><input id="session" class="mono" placeholder="留空创建新会话" disabled><button type="button" id="new-session" class="icon" title="新建会话" aria-label="新建会话" disabled><i data-lucide="plus"></i></button></div></div>
+          <button type="submit" id="submit" class="primary submit" disabled><i data-lucide="send"></i><span id="submit-label">提交任务</span></button>
+        </form>
+        <section class="history"><div class="section-heading"><h2>最近会话</h2><button type="button" id="refresh-sessions" class="icon" title="刷新会话" aria-label="刷新会话" disabled><i data-lucide="refresh-cw"></i></button></div><ul id="sessions" class="history-list"><li class="muted">暂无会话</li></ul></section>
+      </aside>
+      <section class="workspace">
+        <div class="section-heading"><div class="row"><h2>执行记录</h2><span id="task-status" class="task-status">尚未提交</span></div><span id="task-id" class="task-id">—</span></div>
+        <div class="stats"><div><div class="stat-label">创建时间</div><div id="created" class="stat-value">—</div></div><div><div class="stat-label">执行耗时</div><div id="duration" class="stat-value">—</div></div><div><div class="stat-label">Token 用量</div><div id="usage" class="stat-value">—</div></div></div>
+        <dl class="meta"><dt>会话</dt><dd id="active-session" class="mono">—</dd><dt>工作目录</dt><dd id="active-directory" class="mono">—</dd></dl>
+        <div class="detail-tabs" role="tablist" aria-label="执行详情"><button type="button" class="detail-tab" role="tab" aria-selected="true" data-pane="result-pane">分析结果</button><button type="button" class="detail-tab" role="tab" aria-selected="false" data-pane="payload-pane">请求 / 响应</button></div>
+        <section id="result-pane" class="detail-pane"><div id="result-empty" class="empty">暂无分析结果</div><pre id="result" class="result hidden" aria-live="polite"></pre></section>
+        <section id="payload-pane" class="detail-pane hidden"><label>请求体</label><pre id="request-json" class="json">{}</pre><label>响应体</label><pre id="response-json" class="json">{}</pre></section>
+      </section>
+    </main>
+  </section>
+  <footer><span>CodexRelay / Codex SDK</span><span id="last-updated">尚未同步</span></footer>
+
   <script>
     'use strict';
     const $ = id => document.getElementById(id);
     window.lucide?.createIcons();
-    $('endpoint').value = location.origin;
-    let auth = '', connected = false, serviceInfo = null, activeSession = null, task = null, polling = null, epoch = 0, selection = 0, offset = 0, total = 0, submitting = false, retry = null;
-    const labels = {queued:'排队中',running:'执行中',succeeded:'已完成',failed:'失败',cancelled:'已取消',timed_out:'已超时',interrupted:'已中断'};
+    let token = '', serviceInfo = null, task = null, pollTimer = null, submitting = false, taskReady = false;
     const terminal = item => !['queued','running'].includes(item.status);
+    const labels = {queued:'排队中',running:'执行中',succeeded:'已完成',failed:'失败',cancelled:'已取消',timed_out:'已超时',interrupted:'已中断'};
     const formatTime = value => value ? new Date(value).toLocaleString('zh-CN', {hour12:false}) : '—';
-    const errorText = error => error.message || String(error);
-    function alertError(error) { $('alert').textContent = errorText(error); $('alert').classList.remove('hidden'); }
-    function clearError() { $('alert').classList.add('hidden'); $('alert').textContent = ''; }
-    function stopPoll() { clearTimeout(polling); polling = null; }
-    function resetTask() {
-      ++selection; stopPoll(); task = null;
-      $('task-id').value = ''; $('task-status').textContent = '尚未提交'; $('task-status').dataset.state = '';
-      for (const id of ['created','duration','usage','active-session','active-directory']) $(id).textContent = '—';
-      $('result').textContent = ''; $('result').classList.add('hidden'); $('empty').classList.remove('hidden'); $('empty').querySelector('p').textContent = '暂无分析结果';
-      $('request-json').textContent = '{}'; $('response-json').textContent = '{}'; $('events').replaceChildren(); $('result-caption').textContent = '等待任务';
-    }
-    function syncControls() {
-      const sessionId = $('session').value.trim();
-      const legacy = isLegacySession(activeSession);
-      for (const id of ['question','context','session','new-session','refresh-sessions','task-id','lookup']) $(id).disabled = !connected || submitting;
-      for (const button of $('sessions').querySelectorAll('button')) button.disabled = !connected || submitting;
-      $('context').disabled ||= legacy;
-      $('submit').disabled = !connected || submitting || legacy || (sessionId && activeSession?.sessionId !== sessionId) || !$('question').value.trim();
-      $('session-notice').textContent = legacy ? '旧版会话 · 仅可查看历史结果，不可续接' : sessionId && activeSession?.sessionId !== sessionId ? '会话尚未载入' : '';
-      $('session-notice').classList.toggle('hidden', !$('session-notice').textContent);
-      $('submit-label').textContent = submitting ? '提交中…' : '提交任务';
-      $('cancel').disabled = !connected || !task || terminal(task) || !!task.stopReason;
-      $('refresh-task').disabled = !connected || !task;
-      $('copy').disabled = !task?.result?.markdown;
-      $('prev-page').disabled = !connected || offset === 0;
-      $('next-page').disabled = !connected || offset + 6 >= total;
-    }
+    function serviceStatus(label, state = '') { $('service-label').textContent = label; $('service-status').className = 'service-status' + (state ? ' ' + state : ''); }
+    function message(id, value = '') { $(id).textContent = value; $(id).classList.toggle('hidden', !value); }
     async function api(path, options = {}) {
-      const response = await fetch(path, { ...options, headers: { Authorization: 'Bearer ' + auth, ...(options.body ? {'Content-Type':'application/json'} : {}) }, signal: AbortSignal.timeout(15000) });
+      const response = await fetch(path, {...options, headers:{Authorization:'Bearer ' + token,...(options.body ? {'Content-Type':'application/json'} : {})},signal:AbortSignal.timeout(15000)});
       const body = await response.json();
-      if (!response.ok) {
-        const messages = { UNAUTHORIZED:'服务认证已失效，请重新连接。', QUEUE_FULL:'任务队列已满，请稍后重试。', SESSION_CONFIG_CHANGED:'该会话的目录或执行配置已变化，请新建会话。', STORAGE_UNAVAILABLE:'任务存储暂不可用，请联系服务管理员。' };
-        const message = messages[body.error?.code] || body.error?.message || '请求失败';
-        const error = new Error(message + ' [' + (body.error?.code || response.status) + ']');
-        error.status = response.status;
-        throw error;
-      }
+      if (!response.ok) throw new Error(body.error?.message || '请求失败');
       return body;
     }
-    async function bootstrapAuth() {
-      const response = await fetch('/console/session', { signal: AbortSignal.timeout(15000) });
+    async function bootstrap() {
+      const response = await fetch('/console/session', {signal:AbortSignal.timeout(15000)});
       const body = await response.json();
-      if (!response.ok) throw new Error(body.error?.code === 'LOCAL_CONSOLE_ONLY' ? '当前服务未开放本机自动登录，请通过已配置访问令牌的业务后端接入。' : body.error?.message || '无法从服务环境变量读取访问令牌');
-      if (typeof body.token !== 'string' || body.token.length < 24) throw new Error('服务环境变量 CODEX_MCP_TOKEN 不可用');
-      auth = body.token;
+      if (!response.ok || typeof body.token !== 'string') throw new Error('无法取得控制台访问令牌');
+      token = body.token; serviceStatus('已连接','online');
     }
-    function isLegacySession(session) {
-      return !!session && !session.workingDirectory && ('projectKey' in session || 'capability' in session);
+    function setQuota(prefix, quota) {
+      const remaining = typeof quota?.remainingPercent === 'number' ? Math.max(0,Math.min(100,quota.remainingPercent)) : null;
+      const used = typeof quota?.usedPercent === 'number' ? quota.usedPercent : null;
+      $(prefix + 'remaining').textContent = remaining === null ? '暂不可用' : remaining.toFixed(0) + '% 剩余';
+      $(prefix + 'used').textContent = used === null ? '已使用 —' : '已使用 ' + used.toFixed(0) + '%';
+      $(prefix + 'reset').textContent = quota?.resetsAt ? '重置于 ' + formatTime(quota.resetsAt) : '重置时间 —';
+      const bar = $(prefix ? prefix + 'bar' : 'remaining-bar'); bar.style.width = (remaining ?? 0) + '%'; bar.parentElement.setAttribute('aria-valuenow',String(remaining ?? 0));
     }
-    function setSession(session = null) {
-      activeSession = session;
-      $('session').value = session?.sessionId || '';
-      $('context').value = '';
-      retry = null; syncControls();
+    function renderAccount(account) {
+      const authenticated = account?.available && account?.authenticated;
+      $('account').textContent = authenticated ? account.email || 'ChatGPT 账号' : account?.available ? '未登录 Codex' : '账号状态暂不可用';
+      $('plan').textContent = authenticated && account.plan ? account.plan : ''; $('plan').classList.toggle('hidden',!authenticated || !account.plan);
+      $('login-method').textContent = authenticated ? (account.method === 'chatgpt' ? '通过 ChatGPT 账号登录' : '登录方式：' + account.method) : account?.available ? '请在服务端完成 Codex 登录' : '无法从 Codex App Server 读取账号';
+      setQuota('',account?.quota?.primary); const secondary = account?.quota?.secondary; $('secondary').classList.toggle('hidden',!secondary); if (secondary) setQuota('secondary-',secondary);
+      $('reset-credits').textContent = typeof account?.credits?.availableResetCount === 'number' ? account.credits.availableResetCount + ' 次' : '—'; $('checked-at').textContent = formatTime(account?.checkedAt);
+      message('account-message',account?.error ? '暂时无法读取 Codex 账号状态，请确认服务端已安装并登录 Codex。' : '');
     }
-    async function refreshSessions() {
-      const captured = epoch, requestedOffset = offset;
-      const data = await api('/v1/sessions?offset=' + offset + '&limit=6');
-      if (captured !== epoch || requestedOffset !== offset) return;
-      total = data.total;
-      $('session-count').textContent = total + ' 个会话';
-      $('sessions').replaceChildren();
-      if (!data.items.length) { const li = document.createElement('li'); li.textContent = '暂无会话'; li.className = 'muted'; $('sessions').append(li); }
-      for (const session of data.items) {
-        const li = document.createElement('li'), button = document.createElement('button'), title = document.createElement('div'), meta = document.createElement('div');
-        title.className = 'history-title'; title.textContent = isLegacySession(session) ? '旧版会话 · ' + [session.projectKey, session.capability].filter(Boolean).join(' / ') : session.workingDirectory || serviceInfo?.defaultWorkingDirectory || '默认工作目录';
-        meta.className = 'history-meta'; meta.textContent = formatTime(session.createdAt);
-        button.title = session.sessionId; button.append(title, meta); li.append(button); $('sessions').append(li);
-        button.onclick = () => { void openSession(session).catch(alertError); };
-      }
-      syncControls();
+    async function loadAccount(force = false) {
+      $('refresh-account').disabled = true; message('account-message');
+      try { renderAccount(await api(force ? '/v1/admin/account/refresh' : '/v1/admin/account',force ? {method:'POST'} : {})); }
+      catch (error) { message('account-message',error.message || String(error)); }
+      finally { $('refresh-account').disabled = false; }
     }
-    async function openSession(session) {
-      if (submitting) return;
-      resetTask(); clearError(); setSession(); $('session').value = session.sessionId; syncControls();
-      const captured = epoch, view = selection;
-      const info = await api('/v1/sessions/' + encodeURIComponent(session.sessionId) + '?limit=1');
-      if (captured !== epoch || view !== selection) return;
-      setSession(info);
-      if (info.tasks.total) {
-        const last = info.tasks.total > 1 ? await api('/v1/sessions/' + encodeURIComponent(session.sessionId) + '?offset=' + (info.tasks.total - 1) + '&limit=1') : info;
-        if (captured !== epoch || view !== selection) return;
-        await loadTask(last.tasks.items[0].taskId, view);
-      }
+    function syncTaskControls() {
+      const enabled = taskReady && !submitting;
+      for (const id of ['question','context','session','new-session','refresh-sessions']) $(id).disabled = !enabled;
+      $('submit').disabled = !enabled;
+      $('submit-label').textContent = submitting ? '提交中…' : '提交任务';
+    }
+    function resetTask() {
+      clearTimeout(pollTimer); task = null;
+      $('task-status').textContent = '尚未提交'; $('task-status').dataset.state = ''; $('task-id').textContent = '—';
+      for (const id of ['created','duration','usage','active-session','active-directory']) $(id).textContent = '—';
+      $('result').textContent = ''; $('result').classList.add('hidden'); $('result-empty').classList.remove('hidden'); $('request-json').textContent = '{}'; $('response-json').textContent = '{}';
     }
     function renderTask(item) {
-      task = item; $('task-id').value = item.taskId;
-      $('task-status').textContent = item.stopReason && !terminal(item) ? '正在停止' : labels[item.status] || item.status;
-      $('task-status').dataset.state = item.status;
+      task = item; $('task-status').textContent = labels[item.status] || item.status; $('task-status').dataset.state = item.status; $('task-id').textContent = item.taskId;
       $('created').textContent = formatTime(item.createdAt);
-      const elapsed = item.startedAt ? Math.max(0, (new Date(item.finishedAt || Date.now()) - new Date(item.startedAt)) / 1000) : null;
-      $('duration').textContent = elapsed === null ? '—' : elapsed.toFixed(1) + ' s';
-      const usage = item.result?.usage;
-      $('usage').textContent = usage ? ((usage.input_tokens || 0) + (usage.output_tokens || 0)).toLocaleString() : '—';
-      $('active-session').textContent = item.sessionId;
-      const directory = item.workingDirectory || item.result?.workingDirectory || item.request.workingDirectory;
-      const sessionDirectory = activeSession?.sessionId === item.sessionId ? activeSession.workingDirectory : '';
-      $('active-directory').textContent = directory || (isLegacySession(item.request)
-        ? '旧版会话 · ' + [item.request.projectKey, item.request.capability].filter(Boolean).join(' / ')
-        : sessionDirectory || serviceInfo?.defaultWorkingDirectory || '—');
-      $('request-json').textContent = JSON.stringify(item.request, null, 2);
-      $('response-json').textContent = JSON.stringify(item, null, 2);
-      const result = item.result?.markdown || (item.error ? item.error.code + '\n' + item.error.message : terminal(item) ? labels[item.status] : '');
-      $('result').textContent = result; $('result').classList.toggle('hidden', !result); $('empty').classList.toggle('hidden', !!result);
-      $('empty').querySelector('p').textContent = terminal(item) ? '暂无分析结果' : (item.status === 'queued' ? '任务正在排队' : '正在分析…');
-      $('result-caption').textContent = terminal(item) ? '执行结束 · ' + formatTime(item.finishedAt) : '每 2 秒同步';
-      $('events').replaceChildren();
-      for (const event of item.progress) { const li = document.createElement('li'), time = document.createElement('time'), detail = document.createElement('span'); time.textContent = new Date(event.at).toLocaleTimeString('zh-CN', {hour12:false}); detail.textContent = event.detail; li.append(time, detail); $('events').append(li); }
-      if (!item.progress.length) { const li = document.createElement('li'); li.textContent = '暂无事件'; $('events').append(li); }
-      $('last-updated').textContent = '最近同步 ' + new Date().toLocaleTimeString('zh-CN', {hour12:false});
-      syncControls();
+      const elapsed = item.startedAt ? Math.max(0,(new Date(item.finishedAt || Date.now()) - new Date(item.startedAt)) / 1000) : null; $('duration').textContent = elapsed === null ? '—' : elapsed.toFixed(1) + ' s';
+      const usage = item.result?.usage; $('usage').textContent = usage ? ((usage.input_tokens || 0) + (usage.output_tokens || 0)).toLocaleString() : '—';
+      $('active-session').textContent = item.sessionId || '—'; $('active-directory').textContent = item.workingDirectory || item.result?.workingDirectory || serviceInfo?.defaultWorkingDirectory || '—';
+      $('request-json').textContent = JSON.stringify(item.request || {},null,2); $('response-json').textContent = JSON.stringify(item,null,2);
+      const result = item.result?.markdown || item.error?.message || ''; $('result').textContent = result; $('result').classList.toggle('hidden',!result); $('result-empty').classList.toggle('hidden',!!result);
+      $('result-empty').textContent = item.status === 'queued' ? '任务正在排队' : item.status === 'running' ? 'Codex 正在分析…' : '暂无分析结果';
+      $('last-updated').textContent = '最近同步 ' + new Date().toLocaleTimeString('zh-CN',{hour12:false});
     }
-    async function loadTask(id, view = selection) {
-      const captured = epoch;
-      const item = await api('/v1/tasks/' + encodeURIComponent(id));
-      if (captured !== epoch || view !== selection) return;
-      renderTask(item); stopPoll();
-      if (!terminal(item)) polling = setTimeout(() => { void loadTask(id, view).catch(alertError); }, 2000);
+    async function loadTask(id) {
+      const item = await api('/v1/tasks/' + encodeURIComponent(id)); renderTask(item); clearTimeout(pollTimer);
+      if (!terminal(item)) pollTimer = setTimeout(() => { void loadTask(id).catch(error => message('task-message',error.message)); },1000);
       else await refreshSessions();
-      const health = await api('/v1/health');
-      if (captured === epoch && view === selection) $('counts').textContent = '运行 ' + health.running + ' · 排队 ' + health.queued;
     }
-    $('connection-form').onsubmit = async event => {
-      event.preventDefault(); clearError(); ++epoch; resetTask(); connected = false; serviceInfo = null; setSession(); syncControls();
-      auth = ''; $('connect').disabled = true;
-      $('connection-label').textContent = '连接中'; $('connection-status').classList.remove('online');
-      try {
-        await bootstrapAuth();
-        const [health, info] = await Promise.all([api('/v1/health'), api('/v1/info')]);
-        if (!health.ready) throw new Error('服务尚未就绪');
-        if (info.runner !== 'codex') throw new Error('当前服务未启用真实 Codex 执行器');
-        connected = true; serviceInfo = info; offset = 0;
-        $('connection-label').textContent = '已连接'; $('connection-status').classList.add('online');
-        $('counts').textContent = '运行 ' + health.running + ' · 排队 ' + health.queued;
-        await refreshSessions();
-      } catch (error) { connected = false; auth = ''; $('connection-label').textContent = '连接失败'; alertError(error); }
-      finally { $('connect').disabled = false; syncControls(); }
-    };
-    $('task-form').onsubmit = async event => {
-      event.preventDefault(); if (!connected || submitting || !$('question').value.trim()) return;
-      if (isLegacySession(activeSession) || ($('session').value.trim() && activeSession?.sessionId !== $('session').value.trim())) { alertError(new Error('该会话不可续接，请载入有效会话或新建会话。')); return; }
-      clearError(); stopPoll(); const captured = epoch, view = ++selection;
-      const request = { question:$('question').value };
-      const rawContext = $('context').value.trim();
-      if (rawContext) {
-        try {
-          const value = JSON.parse(rawContext);
-          if (!value || Array.isArray(value) || typeof value !== 'object') throw new Error();
-          request.context = value;
-        } catch { alertError(new Error('附加上下文必须是有效的 JSON 对象。')); return; }
+    async function refreshSessions() {
+      const data = await api('/v1/sessions?offset=0&limit=6'); $('sessions').replaceChildren();
+      if (!data.items.length) { const li = document.createElement('li'); li.className = 'muted'; li.textContent = '暂无会话'; $('sessions').append(li); return; }
+      for (const session of data.items) {
+        const li = document.createElement('li'), button = document.createElement('button'), text = document.createElement('span'), time = document.createElement('span');
+        text.className = 'history-title'; text.textContent = session.workingDirectory || session.sessionId; time.className = 'history-time'; time.textContent = formatTime(session.createdAt); button.append(text,time); li.append(button); $('sessions').append(li);
+        button.onclick = async () => {
+          try { const detail = await api('/v1/sessions/' + encodeURIComponent(session.sessionId) + '?limit=1'); $('session').value = detail.sessionId; if (detail.tasks?.items?.length) await loadTask(detail.tasks.items.at(-1).taskId); }
+          catch (error) { message('task-message',error.message); }
+        };
       }
-      if ($('session').value.trim()) request.sessionId = $('session').value.trim();
-      const fingerprint = JSON.stringify(request);
-      if (!retry || retry.fingerprint !== fingerprint) retry = { fingerprint, id:crypto.randomUUID() };
-      request.idempotencyKey = retry.id; $('request-json').textContent = JSON.stringify(request, null, 2);
-      submitting = true; syncControls();
+    }
+    async function ensureTaskConsole() {
+      if (taskReady) return;
+      message('task-message');
+      try { serviceInfo = await api('/v1/info'); if (serviceInfo.runner !== 'codex') throw new Error('当前服务未启用真实 Codex 执行器'); taskReady = true; await refreshSessions(); }
+      catch (error) { message('task-message',error.message || String(error)); }
+      finally { syncTaskControls(); }
+    }
+    async function reconnectTaskConsole() {
+      $('reconnect').disabled = true; taskReady = false; syncTaskControls(); message('task-message'); serviceStatus('正在连接');
       try {
-        const item = await api('/v1/tasks', { method:'POST', body:JSON.stringify(request) });
-        if (captured !== epoch || view !== selection) return;
-        retry = null; activeSession = null; $('session').value = item.sessionId; renderTask(item);
-        const session = await api('/v1/sessions/' + encodeURIComponent(item.sessionId) + '?limit=1');
-        if (captured !== epoch || view !== selection) return;
-        setSession(session);
-        renderTask(item); await refreshSessions(); await loadTask(item.taskId, view);
-      } catch (error) { alertError(error); }
-      finally { submitting = false; syncControls(); }
+        await bootstrap();
+        serviceInfo = await api('/v1/info');
+        if (serviceInfo.runner !== 'codex') throw new Error('当前服务未启用真实 Codex 执行器');
+        taskReady = true; await refreshSessions();
+      } catch (error) {
+        serviceStatus('连接失败','error'); message('task-message',error.message || String(error));
+      } finally { $('reconnect').disabled = false; syncTaskControls(); }
+    }
+    function showView(id) {
+      for (const name of ['account-view','task-view']) $(name).classList.toggle('hidden',name !== id);
+      for (const button of document.querySelectorAll('.quick-nav button')) button.setAttribute('aria-current',button.dataset.view === id ? 'page' : 'false');
+      if (id === 'task-view') void ensureTaskConsole();
+    }
+    $('task-form').onsubmit = async event => {
+      event.preventDefault(); if (!taskReady || submitting) return;
+      if (!$('question').value.trim()) { message('task-message','请先填写问题内容。'); $('question').focus(); return; }
+      message('task-message'); const request = {question:$('question').value,idempotencyKey:crypto.randomUUID()}; const rawContext = $('context').value.trim();
+      if (rawContext) { try { const value = JSON.parse(rawContext); if (!value || Array.isArray(value) || typeof value !== 'object') throw new Error(); request.context = value; } catch { message('task-message','附加上下文必须是有效的 JSON 对象。'); return; } }
+      if ($('session').value.trim()) request.sessionId = $('session').value.trim();
+      submitting = true; syncTaskControls(); $('request-json').textContent = JSON.stringify(request,null,2);
+      try { const item = await api('/v1/tasks',{method:'POST',body:JSON.stringify(request)}); $('session').value = item.sessionId; renderTask(item); await loadTask(item.taskId); }
+      catch (error) { message('task-message',error.message || String(error)); }
+      finally { submitting = false; syncTaskControls(); }
     };
-    $('question').oninput = syncControls;
-    $('session').oninput = () => { resetTask(); const id = $('session').value; setSession(); $('session').value = id; syncControls(); };
-    $('session').onchange = () => { const sessionId = $('session').value.trim(); if (sessionId) void openSession({ sessionId }).catch(alertError); };
-    $('new-session').onclick = () => { resetTask(); clearError(); setSession(); $('question').value = ''; syncControls(); $('question').focus(); };
-    $('lookup').onclick = () => { const id = $('task-id').value.trim(); if (!/^task_[0-9a-f-]{36}$/.test(id)) { alertError(new Error('请填写有效的任务 ID')); return; } clearError(); stopPoll(); void loadTask(id, ++selection).catch(alertError); };
-    $('refresh-task').onclick = () => { if (task) { clearError(); stopPoll(); void loadTask(task.taskId).catch(alertError); } };
-    $('cancel').onclick = async () => { if (!task || terminal(task)) return; const id = task.taskId, view = selection; $('cancel').disabled = true; try { await api('/v1/tasks/' + encodeURIComponent(id) + '/cancel', {method:'POST'}); await loadTask(id, view); } catch (error) { alertError(error); } finally { syncControls(); } };
-    $('refresh-sessions').onclick = () => { void refreshSessions().catch(alertError); };
-    $('prev-page').onclick = () => { offset = Math.max(0, offset - 6); void refreshSessions().catch(alertError); };
-    $('next-page').onclick = () => { offset += 6; void refreshSessions().catch(alertError); };
-    $('copy').onclick = async () => { try { await navigator.clipboard.writeText(task?.result?.markdown || ''); $('copy').title = '已复制'; setTimeout(() => $('copy').title = '复制结果', 1500); } catch { alertError(new Error('无法访问剪贴板，请选中结果后复制。')); } };
-    for (const tab of document.querySelectorAll('[role=tab]')) tab.onclick = () => { for (const other of document.querySelectorAll('[role=tab]')) { const selected = other === tab; other.setAttribute('aria-selected', String(selected)); $(other.getAttribute('aria-controls')).classList.toggle('hidden', !selected); } };
-    if (location.protocol === 'file:') { alertError(new Error('请通过服务地址 http://127.0.0.1:8787/ 打开页面。')); $('connect').disabled = true; }
-    syncControls();
+    $('question').oninput = syncTaskControls;
+    $('new-session').onclick = () => { $('session').value = ''; $('question').value = ''; $('context').value = ''; resetTask(); syncTaskControls(); $('question').focus(); };
+    $('refresh-sessions').onclick = () => { void refreshSessions().catch(error => message('task-message',error.message)); };
+    $('refresh-account').onclick = () => { void loadAccount(true); };
+    $('reconnect').onclick = () => { void reconnectTaskConsole(); };
+    for (const button of document.querySelectorAll('.quick-nav button')) button.onclick = () => showView(button.dataset.view);
+    for (const tab of document.querySelectorAll('.detail-tab')) tab.onclick = () => {
+      for (const item of document.querySelectorAll('.detail-tab')) { const selected = item === tab; item.setAttribute('aria-selected',String(selected)); $(item.dataset.pane).classList.toggle('hidden',!selected); }
+    };
+    $('endpoint').value = location.origin;
+    if (location.protocol === 'file:') { serviceStatus('打开方式错误','error'); message('account-message','请通过 CodexRelay 服务地址打开此页面。'); }
+    else void (async () => { try { await bootstrap(); await loadAccount(); } catch (error) { serviceStatus('连接失败','error'); message('account-message',error.message || String(error)); } })();
+    syncTaskControls();
   </script>
 </body>
 </html>

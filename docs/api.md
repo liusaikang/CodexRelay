@@ -57,6 +57,8 @@ stdio 依赖本机操作系统权限，日志写 stderr，stdout 留给协议。
 | GET | /healthz | 公开健康检查 |
 | GET | /v1/health | 认证后的调度健康状态 |
 | GET | /v1/info | 服务信息，替代旧能力发现接口 |
+| GET | /v1/admin/account | 读取脱敏账号与额度信息 |
+| POST | /v1/admin/account/refresh | 强制刷新脱敏账号与额度信息 |
 | POST | /v1/tasks | 提交任务，HTTP 202 |
 | GET | /v1/tasks/:taskId | 查询任务 |
 | POST | /v1/tasks/:taskId/cancel | 请求取消 |
@@ -64,6 +66,8 @@ stdio 依赖本机操作系统权限，日志写 stderr，stdout 留给协议。
 | GET | /v1/sessions/:sessionId?offset=0&limit=20 | 会话及任务摘要 |
 
 `/v1/info` 替代 `/v1/capabilities`，不是兼容别名。URL 中的 `/v1/` 是 HTTP API 路径，与新存储记录的 `version: 2` 无关，不应改成 `/v2/`。
+
+管理接口同样要求 Bearer Token。账号状态通过当前 Codex App Server 读取并缓存 30 秒；只返回脱敏邮箱、订阅方案、额度窗口和汇总用量，不返回账号 ID、认证令牌或认证文件。上游协议不可用时，接口以 `account.available: false` 降级，任务服务本身仍可继续工作。
 
 最小提交及查询示例：
 

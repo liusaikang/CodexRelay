@@ -6,8 +6,9 @@ import { z, ZodError } from 'zod';
 import { createMcpServer } from './mcp.js';
 import { TaskService } from '../service.js';
 import { AppError, idSchema, pageSchema } from '../types.js';
+import type { AccountStatusProvider } from '../account.js';
 
-export function createHttpApp(service: TaskService, token: string) {
+export function createHttpApp(service: TaskService, token: string, accountStatus?: AccountStatusProvider) {
   if (token.length < 24) throw new Error('Service token must be at least 24 characters');
   const app = express();
   app.disable('x-powered-by');
@@ -58,6 +59,12 @@ export function createHttpApp(service: TaskService, token: string) {
   };
   app.get('/v1/health', (_req, res) => res.json(service.health()));
   app.get('/v1/info', (_req, res) => res.json(service.info()));
+  app.get('/v1/admin/account', async (_req, res) => res.json(accountStatus
+    ? await accountStatus.read()
+    : { available: false, authenticated: false, checkedAt: new Date().toISOString() }));
+  app.post('/v1/admin/account/refresh', async (_req, res) => res.json(accountStatus
+    ? await accountStatus.read(true)
+    : { available: false, authenticated: false, checkedAt: new Date().toISOString() }));
   app.post('/v1/tasks', async (req, res) => res.status(202).json(await service.submit(req.body)));
   app.get('/v1/tasks/:id', (req, res) => res.json(service.getTask(idSchema.parse(req.params.id))));
   app.post('/v1/tasks/:id/cancel', async (req, res) => res.json(await service.cancel(idSchema.parse(req.params.id))));
