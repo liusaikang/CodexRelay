@@ -1,0 +1,28 @@
+# Production paths and credentials are supplied by the deployment environment.
+dataDir: ${CODEX_DATA_DIR}
+invocationLog:
+  enabled: true
+  directory: ${CODEX_INVOCATION_LOG_DIR}
+  retentionDays: 30
+server:
+  host: ${CODEX_BIND_HOST:-127.0.0.1}
+  port: 8787
+  tokenEnv: CODEX_MCP_TOKEN
+  localConsole: false
+  consoleAuth:
+    username: ${CODEX_CONSOLE_USERNAME}
+    password: ${CODEX_CONSOLE_PASSWORD}
+  allowedHosts: [localhost, 127.0.0.1, '[::1]', '${CODEX_PUBLIC_HOST}']
+  allowedOrigins: ['${CODEX_PUBLIC_ORIGIN}']
+tasks:
+  maxConcurrent: 3
+  maxQueued: 100
+  timeoutSeconds: 600
+  queueTimeoutSeconds: 1800
+runner: codex
+codex:
+  home: ${CODEX_HOME}
+  defaultWorkingDirectory: ${CODEX_WORKSPACE}
+  defaultModel: ${CODEX_MODEL:-}
+  defaultReasoningEffort: ${CODEX_MODEL_REASONING_EFFORT:-}
+  envAllowlist: [CODEX_API_KEY, HTTPS_PROXY, HTTP_PROXY, NO_PROXY]

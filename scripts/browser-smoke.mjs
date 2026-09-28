@@ -32,6 +32,7 @@ async function checkLayout(page) {
 
 try {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  await context.addCookies([{ name: 'codex_console', value: 'browser-smoke-session', url: 'http://127.0.0.1:8787/' }]);
   const page = await context.newPage();
   page.on('pageerror', error => errors.push(error.message));
   const requests = [], submissions = [];
@@ -48,9 +49,9 @@ try {
     if (path === '/assets/invocations.js') return scriptFail
       ? route.fulfill({ status: 401, json: { error: { code: 'UNAUTHORIZED' } } })
       : route.fulfill({ contentType: 'application/javascript', body: invocationScript });
-    if (path === '/console/session') return route.fulfill({ json: { token: 'browser-smoke-fixture-token-only' } });
-    if (request.headers().authorization !== 'Bearer browser-smoke-fixture-token-only') {
-      errors.push('Missing fixture authorization: ' + path);
+    if (path === '/console/session') return route.fulfill({ json: { username: 'admin' } });
+    if (!request.headers().cookie?.includes('codex_console=browser-smoke-session')) {
+      errors.push('Missing fixture console session: ' + path);
       return route.fulfill({ status: 401, json: { error: { code: 'UNAUTHORIZED' } } });
     }
     if (path === '/v1/admin/account' && request.method() === 'GET') {
@@ -98,7 +99,7 @@ try {
   await expect(page.locator('#remaining')).toHaveText('62% 剩余');
   await page.getByRole('button', { name: 'Codex 调用', exact: true }).click();
   await expect(page.getByLabel('服务地址')).toHaveValue('http://127.0.0.1:8787');
-  await expect(page.getByLabel('认证来源')).toHaveValue('由服务环境变量 CODEX_MCP_TOKEN 自动提供');
+  await expect(page.getByLabel('认证来源')).toHaveValue('控制台登录会话');
   await expect(page.getByRole('button', { name: '重新连接', exact: true })).toBeEnabled();
   await expect(page.getByLabel('问题内容')).toBeVisible();
   const submit = page.getByRole('button', { name: '提交任务', exact: true });

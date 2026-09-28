@@ -15,8 +15,9 @@ const optionalExpanded = (value?: string) => value === undefined ? undefined : e
 const serverSchema = z.object({
   host: z.string().default('127.0.0.1'), port: z.number().int().min(0).max(65535).default(8787),
   tokenEnv: z.string().default('CODEX_MCP_TOKEN'), localConsole: z.boolean().default(false),
+  consoleAuth: z.object({ username: z.string().min(1), password: z.string().min(1) }).strict().optional(),
   allowedHosts: z.array(z.string()).min(1).default(['localhost', '127.0.0.1', '[::1]']),
-  allowedOrigins: z.array(z.string().url()).default([]),
+  allowedOrigins: z.array(z.string()).default([]),
 }).strict();
 const tasksSchema = z.object({
   maxConcurrent: z.number().int().min(1).max(64).default(10),
@@ -57,7 +58,14 @@ export async function loadConfig(file: string): Promise<RuntimeConfig> {
     throw new Error('Legacy capability configuration is no longer supported. Use codex.defaultWorkingDirectory and native .agents/skills; see docs/configuration.md.');
   }
   const config = configSchema.parse(raw);
-  if (config.server.localConsole && !['127.0.0.1', '::1'].includes(config.server.host)) {
+  const host = expandEnv(config.server.host);
+  const allowedHosts = config.server.allowedHosts.map(expandEnv);
+  const allowedOrigins = config.server.allowedOrigins.map(value => {
+    const origin = z.string().url().parse(expandEnv(value));
+    if (new URL(origin).origin !== origin) throw new Error('server.allowedOrigins must contain origins without paths');
+    return origin;
+  });
+  if (config.server.localConsole && !['127.0.0.1', '::1'].includes(host)) {
     throw new Error('server.localConsole requires a loopback-only listener (127.0.0.1 or ::1)');
   }
   const effort = optionalExpanded(config.codex.defaultReasoningEffort);
@@ -74,7 +82,10 @@ export async function loadConfig(file: string): Promise<RuntimeConfig> {
   }
   return {
     invocationLog: { ...config.invocationLog, directory: logDirectory },
-    ...config.server, ...config.tasks, runner: config.runner,
+    ...config.server, host, allowedHosts, allowedOrigins, consoleAuth: config.server.consoleAuth && {
+      username: expandEnv(config.server.consoleAuth.username),
+      password: expandEnv(config.server.consoleAuth.password),
+    }, ...config.tasks, runner: config.runner,
     dataDir: resolve(base, expandEnv(config.dataDir)), codexHome: resolve(base, expandEnv(config.codex.home)),
     defaultWorkingDirectory: await resolveWorkingDirectory(resolve(base, expandEnv(config.codex.defaultWorkingDirectory))),
     defaultModel: optionalExpanded(config.codex.defaultModel),

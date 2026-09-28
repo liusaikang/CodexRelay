@@ -12,7 +12,7 @@ $env:CODEX_HOME = (Resolve-Path .\data\codex-home).Path
 node node_modules/@openai/codex/bin/codex.js login
 ```
 
-这只设置当前终端环境。最终目录必须与 YAML 中的 `codex.home` 一致，默认占位符为 `${CODEX_HOME:-../data/codex-home}`。使用 `CODEX_API_KEY` 时可按账户认证方式省略登录，且应将变量列入 `codex.envAllowlist`。不要把个人认证目录打包进镜像。
+这只设置当前终端环境。最终目录必须与所选环境 YAML 中的 `codex.home` 一致：开发配置固定使用 `../data/codex-home`，生产配置必须显式设置 `CODEX_HOME`。使用 `CODEX_API_KEY` 时可按账户认证方式省略登录，且应将变量列入 `codex.envAllowlist`。不要把个人认证目录打包进镜像。
 
 Linux 服务管理可使用 systemd，路径按部署实际调整：
 
@@ -26,7 +26,7 @@ Type=simple
 User=codexmcp
 WorkingDirectory=/opt/codex-mcp
 EnvironmentFile=/etc/codex-mcp.env
-ExecStart=/usr/bin/node /opt/codex-mcp/dist/main.js --config /opt/codex-mcp/config/local.yaml
+ExecStart=/usr/bin/node /opt/codex-mcp/dist/main.js --config /opt/codex-mcp/config/production.yaml
 KillMode=control-group
 TimeoutStopSec=30
 Restart=no
@@ -39,20 +39,22 @@ WantedBy=multi-user.target
 
 ## 数据布局
 
-默认 YAML 位于 `config/` 时：
+开发环境目录示例：
 
 ```text
-data/native-service/
+data/native-logs-preview/
   instance.lock
   sessions/sess_<uuid>.json
   tasks/task_<uuid>.json
+data/invocation-logs/
+  YYYY-MM-DD/task_<uuid>.json
 data/codex-home/
   config.toml
   sessions/...
   ...Codex 管理的认证与状态
 ```
 
-`dataDir` 默认改为 `../data/native-service`；新任务和会话写入 `version: 2`。`codex.home` 保存原生线程和认证，任务 JSON 不是完整模型上下文的替代品。数据记录版本与 HTTP `/v1/` 路径无关。
+开发配置指向现有 `data/native-logs-preview`，生产配置要求独立的 `CODEX_DATA_DIR`、`CODEX_INVOCATION_LOG_DIR` 和 `CODEX_HOME`；新任务和会话写入 `version: 2`。`codex.home` 保存原生线程和认证，任务 JSON 不是完整模型上下文的替代品。数据记录版本与 HTTP `/v1/` 路径无关。
 
 问题、结果、原生日志和工具输出可能含敏感业务信息。限制运行目录权限，Windows 设置专用 ACL；备份按含凭据资料保护，不上传到公开仓库或文档。
 
@@ -67,7 +69,7 @@ data/codex-home/
 
 ## 从旧 v1 升级
 
-新默认目录与旧数据隔离，不会自动删除、移动或汇总旧目录。迁移前以旧配置实际 `dataDir` 为准，不假设所有历史实例都使用同一路径。
+生产目录与开发数据隔离，不会自动删除、移动或汇总其他目录。迁移前以旧配置实际 `dataDir` 为准，不假设所有历史实例都使用同一路径。
 
 | 记录 | 升级后的处理 |
 | --- | --- |
@@ -78,7 +80,7 @@ data/codex-home/
 | 新任务和会话 | 写入 version 2 |
 | v2 queued | 仅通过新版本恢复校验后可调度 |
 
-需要查询旧历史时，先停旧实例并备份。由管理员明确让兼容读取逻辑加载包含 v1 记录的 `dataDir`；建议在停机备份副本上验收，再选择使用该存储。新默认目录本身不会跨目录读取历史。不要让两个进程共用目录，不手工拼接不同实例的记录或改写版本号。
+需要查询旧历史时，先停旧实例并备份。由管理员明确让兼容读取逻辑加载包含 v1 记录的 `dataDir`；建议在停机备份副本上验收，再选择使用该存储。任何配置都不会跨目录读取历史。不要让两个进程共用目录，不手工拼接不同实例的记录或改写版本号。
 
 旧 v1 queued 不会启动 worker；调度恢复检查将其标为 `failed`，记录 `LEGACY_SESSION` 错误并保留历史。如果排队截止时间已经过去，则先标记 `timed_out` / `QUEUE_EXPIRED`。旧会话续接请求返回 `LEGACY_SESSION`（HTTP 409）。需要重新执行的问题由调用方显式提交新任务，使用新会话和新幂等键；这可能产生新的模型费用。
 

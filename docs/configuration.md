@@ -1,18 +1,21 @@
 # 配置与原生扩展
 
-配置在启动时加载，修改服务 YAML 后需重启。配置中的相对路径以 YAML 所在目录为基准。工作目录、模型和推理强度只由服务配置控制，任务请求不能覆盖。
+配置在启动时加载，修改服务 YAML 后需重启。固定使用 `config/development.yaml` 与 `config/production.yaml`；`npm run start:dev` 和 `npm run start:prod` 分别加载对应文件，`npm start` 也指向开发环境。配置中的相对路径以 YAML 所在目录为基准。工作目录、模型和推理强度只由服务配置控制，任务请求不能覆盖。
 
 ## 服务配置
 
 以下样例假定 YAML 位于仓库 `config/` 目录：
 
 ```yaml
-dataDir: ../data/native-service
+dataDir: ../data/native-logs-preview
 server:
   host: 127.0.0.1
   port: 8787
   tokenEnv: CODEX_MCP_TOKEN
-  localConsole: false
+  localConsole: true
+  consoleAuth:
+    username: admin
+    password: admin
   allowedHosts: [localhost, 127.0.0.1, "[::1]"]
   allowedOrigins: []
 tasks:
@@ -22,7 +25,7 @@ tasks:
   queueTimeoutSeconds: 1800
 runner: codex
 codex:
-  home: ${CODEX_HOME:-../data/codex-home}
+  home: ../data/codex-home
   defaultWorkingDirectory: ../examples/workspace
   defaultModel: ${CODEX_MODEL:-}
   defaultReasoningEffort: ${CODEX_MODEL_REASONING_EFFORT:-}
@@ -35,7 +38,7 @@ codex:
 
 `queueTimeoutSeconds` 控制等待期限，默认 1800 秒，范围 1 到 604800 秒。会话依赖等待、人工确认等待、停机时间均计入；修改配置不延长已接受任务的期限。接收阶段容量自动取 `maxConcurrent + maxQueued`，无需新增容量参数。详细状态与恢复策略见 [任务调度](scheduling.md)。
 
-`codex.home` 是专用持久化目录，保存认证、原生配置和线程状态。`CODEX_HOME` 通过上述占位符选择这个目录，不应直接使用开发者个人日常 home。`${VARIABLE}` 缺失时应报错；`${VARIABLE:-fallback}` 使用回退值。默认模型和推理强度展开为空表示未指定，由 Codex 采用原生默认值，不绑定某个模型名称。
+以上是开发环境示意，仅可在本机使用。生产配置要求环境变量明确指定任务目录、调用日志目录、Codex home、工作目录、控制台账号密码和公开访问来源。`codex.home` 是专用持久化目录，保存认证、原生配置和线程状态，不应直接使用开发者个人日常 home。`${VARIABLE}` 缺失时应报错；`${VARIABLE:-fallback}` 使用回退值。默认模型和推理强度展开为空表示未指定，由 Codex 采用原生默认值，不绑定某个模型名称。
 
 新配置不存在 `projects`、`capabilities`、`promptFile`、`skillFiles`、`mcpServers`，也不再使用顶层 `codexHome` 或 `execution`。这些旧字段不是新结构的别名，应删除并迁移，不要混用。
 
@@ -43,12 +46,12 @@ codex:
 
 ```yaml
 invocationLog:
-  enabled: false
+  enabled: true
   directory: ../data/invocation-logs
   retentionDays: 30
 ```
 
-`enabled` 默认关闭。设置为 `true` 并重启后，所有入口成功接受的新分析任务都会记录，来源为 `http`、`mcp` 或 `stdio`。`directory` 相对于 YAML 文件解析，支持环境变量；解析真实路径后必须与 `dataDir`、`codex.home` 分离。日志根目录及其内部不能是符号链接或目录联接；允许受信任的父级路径包含系统链接（如 macOS 临时目录），启动时固定父级的真实位置，后续不随别名改变而切换日志位置。`retentionDays` 取值 1–3650，默认 30 天。
+未显式配置时 `enabled` 默认关闭；固定的开发和生产配置都设置为 `true`。启用后，所有入口成功接受的新分析任务都会记录，来源为 `http`、`mcp` 或 `stdio`。`directory` 相对于 YAML 文件解析，支持环境变量；解析真实路径后必须与 `dataDir`、`codex.home` 分离。日志根目录及其内部不能是符号链接或目录联接；允许受信任的父级路径包含系统链接（如 macOS 临时目录），启动时固定父级的真实位置，后续不随别名改变而切换日志位置。`retentionDays` 取值 1–3650，默认 30 天。
 
 日志以 UTC 提交日期分目录，每个任务一个 JSON 文件：`data/invocation-logs/YYYY-MM-DD/task_<uuid>.json`。记录用户提交的 `question`、可选 `context`、会话和任务 ID、来源、各阶段时间、状态、耗时、结果、用量及安全化错误。它不是 Codex 完整内部提示词、系统提示词或原生线程事件日志。幂等重试返回原任务，统计不会重复计数；轮询、鉴权失败、参数错误和队列满等未接受的请求不计入。
 
@@ -104,8 +107,8 @@ enabled_tools = ["query", "search_logs", "manage_service"]
 
 ## HTTP 接入边界
 
-`server` 保留 `host`、`port`、`tokenEnv`、`localConsole`、`allowedHosts`、`allowedOrigins`。`tokenEnv` 只存环境变量名，不存令牌。跨网络部署使用 HTTPS 反向代理，并将实际域名和必要的准确 Origin 加入相应白名单。
+`server.consoleAuth` 配置网页控制台用户名和密码，密码可使用环境变量占位符；缺省时不允许网页登录。开发配置仅供本机使用 `admin/admin`，生产配置要求环境变量提供独立账号密码，不要将开发密码用于对外服务。网页登录会话保存在进程内，8 小时后失效，重启也会失效；退出登录立即撤销当前会话。跨网络部署使用 HTTPS 反向代理，并将实际域名和必要的准确 Origin 加入相应白名单。
 
-`localConsole: true` 仅用于可信开发者的回环监听调试，自动取令牌接口拒绝转发连接。生产关闭该选项，不要代理公开本机自动登录入口。Origin 校验不是用户授权，也不代表提供任意跨域 CORS 接入。
+`localConsole` 是旧配置兼容字段，不再提供自动取令牌功能。网页使用 HttpOnly、SameSite=Strict Cookie，写请求还要求同源 Origin；业务 HTTP/MCP 不接受网页 Cookie 代替其 Bearer Token。Origin 校验不是用户授权，也不代表提供任意跨域 CORS 接入。
 
 该网关使用单共享 Token，不提供复杂 RBAC、目录级授权或多租户隔离。可信后端负责访问任务结果的权限、`context` 数据最小化及敏感信息脱敏。

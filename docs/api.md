@@ -45,7 +45,7 @@ HTTP `POST /v1/tasks` 与 MCP `codex_submit_task` 使用同一输入：
 本机 stdio 启动命令：
 
 ```sh
-node dist/main.js --transport stdio --config config/default.yaml
+node dist/main.js --transport stdio --config config/development.yaml
 ```
 
 stdio 依赖本机操作系统权限，日志写 stderr，stdout 留给协议。HTTP 和 stdio 实例不得同时占用同一个数据目录；多个客户端共享一个 HTTP 服务即可。
@@ -148,4 +148,4 @@ HTTP 断连或客户端等待超时不会取消已接受的任务。服务不自
 
 问题最多 32000 字符，`context` 最多 16 KiB，请求体最多 128 KiB，分页 limit 为 1-100；任务查询保留最近 100 条进度，最终回答最多 1 MiB，每任务最多 10000 个 SDK 事件。问题、上下文、结果和原生历史可能含敏感信息，调用方应先脱敏。
 
-静态调试入口 `/`、`/console` 不等于业务接口免认证。`GET /console/session` 仅供 `server.localConsole: true` 下的直接本机调试连接取得令牌；生产必须关闭，不能代理公开。
+网页控制台未登录时从 `/`、`/console` 跳转 `/login`。`POST /console/login` 使用 `server.consoleAuth` 验证并设置 HttpOnly 会话 Cookie；`GET /console/session` 仅返回登录用户名和执行器，不再返回服务令牌；`POST /console/logout` 撤销会话。网页同源请求可凭 Cookie 使用 HTTP API，跨站写请求被拒绝；MCP 仍必须使用 Bearer Token。

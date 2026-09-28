@@ -16,29 +16,41 @@
 npm ci
 npm run init:env
 npm run build
-npm run config:check
-npm run start:env
+npm run check:dev
+npm run start:dev
 ```
 
-启动前核对 YAML 使用 [新配置结构](configuration.md)：`dataDir: ../data/native-service`，顶层 `runner: codex`，以及 `server`、`tasks`、`codex`。不要继续加载旧项目/能力配置。配置检查只做预检查，不代表模型认证、skill 发现或实际沙箱权限已经通过。
+开发环境固定加载 `config/development.yaml`，继续读取 `data/native-logs-preview` 中的已有会话和 `data/invocation-logs` 中的调用日志。`npm start` 和旧的 `npm run start:env` 也启动开发环境。配置检查只做预检查，不代表模型认证、skill 发现或实际沙箱权限已经通过。
 
 `init:env` 生成随机服务令牌到 `.env`，不要提交该文件。服务 Token 与模型认证不同：使用 `CODEX_API_KEY`，或按 [运维说明](operations.md) 在专用 `codex.home` 登录。`CODEX_MODEL` 和 `CODEX_MODEL_REASONING_EFFORT` 可留空，或作为新会话默认值。
 
 需要代理时配置 `HTTPS_PROXY` / `HTTP_PROXY`，并在 `codex.envAllowlist` 中允许必要变量。`NO_PROXY` 应包含本机服务地址。不要假定 CLI 自动继承桌面应用或系统代理；Node 环境文件也不会覆盖终端已存在的同名环境变量。
 
-本机调试页面为 `http://127.0.0.1:8787/`。只有显式启用 `server.localConsole: true` 的直接回环连接可自动取得令牌；服务器部署关闭此项，不要将自动登录入口通过代理公开。
+本机调试页面为 `http://127.0.0.1:8787/`。未登录会跳转 `/login`；开发环境示例账号密码为 `admin/admin`，不可对外使用。网页登录不返回服务令牌，后端与 MCP 继续使用 Bearer Token。
+
+## 原生生产环境
+
+生产环境固定加载 `config/production.yaml`，必须使用独立持久化路径。先在未提交的 `.env` 中提供 `CODEX_DATA_DIR`、`CODEX_INVOCATION_LOG_DIR`、`CODEX_HOME`、`CODEX_WORKSPACE`、`CODEX_CONSOLE_USERNAME`、`CODEX_CONSOLE_PASSWORD`、`CODEX_PUBLIC_HOST`（域名，不含协议/端口）和 `CODEX_PUBLIC_ORIGIN`（完整来源，如 `https://codex.example.com`）。服务访问令牌仍由 `init:env` 初始化的 `CODEX_MCP_TOKEN` 提供。工作目录需预先存在；三个数据目录不得重叠，也不得与开发环境目录重叠。然后运行：
+
+```sh
+npm run build
+npm run check:prod
+npm run start:prod
+```
+
+生产环境默认只监听 `127.0.0.1:8787`，由 HTTPS 反向代理对外提供访问；仅在有受控网络边界时设置 `CODEX_BIND_HOST=0.0.0.0`。开发与生产的 `CODEX_HOME` 必须分开，否则模型线程及认证会混用。不要在同一端口同时启动两套环境。
 
 离线演示使用 demo 配置：
 
 ```sh
-npm run start:env -- --config config/demo.yaml
+node --env-file=.env dist/main.js --config config/demo.yaml
 ```
 
 其中 `runner: demo` 不调用模型，不验证真实数据源或原生 skills。真实模型 smoke 会消耗额度，必须单独授权部署凭据并记录结果。
 
 ## 接入工作目录
 
-服务默认目录是相对配置文件的 `../examples/workspace`。部署自有项目时由管理员设置 `codex.defaultWorkingDirectory`；调用方不能通过请求切换工作目录，也不再注册项目名或能力名。
+开发环境默认目录是相对配置文件的 `../examples/workspace`。生产环境由管理员设置 `CODEX_WORKSPACE`；调用方不能通过请求切换工作目录，也不再注册项目名或能力名。
 
 在目标目录准备 `AGENTS.md` 和 `.agents/skills/<名称>/SKILL.md`。示例约定为 `examples/workspace/AGENTS.md` 与 `examples/workspace/.agents/skills/log-evidence/SKILL.md`。技能由 Codex 原生发现，service 不扫描或拼接内容。不要将 skill 仅放到与任务工作目录无关的 service 源目录并期待生效。
 
@@ -46,19 +58,19 @@ npm run start:env -- --config config/demo.yaml
 
 ## Docker 部署
 
-Dockerfile、Compose 和容器配置已适配原生任务网关结构，尚未进行实际构建与运行验收。部署前按目标宿主核对挂载路径、默认工作目录、认证及代理；从旧版本升级时不要继续加载旧项目/能力配置。
+Dockerfile、Compose 使用 `config/production.yaml`，尚未进行实际构建与运行验收。部署前在未提交的 `.env` 设置强密码 `CODEX_CONSOLE_PASSWORD`、`CODEX_PUBLIC_HOST`、`CODEX_PUBLIC_ORIGIN` 和 `CODEX_WORKSPACE_HOST`（宿主项目绝对路径）；Compose 会将工作目录挂载为 `/workspace`，并将生产任务、调用日志与 Codex home 持久化到独立的 `/data` 子目录。核对认证及代理后执行：
 
 在已配置模型认证和服务 Token 的部署环境中执行：
 
 ```sh
 docker compose build
-docker compose run --rm codex-mcp node dist/main.js --config config/docker.yaml --check
+docker compose run --rm codex-mcp node dist/main.js --config config/production.yaml --check
 docker compose up -d
 docker compose ps
 docker compose logs --tail=100 codex-mcp
 ```
 
-容器内建议明确配置 `dataDir: /data/native-service` 与 `codex.home: /data/codex-home`，并持久化这两个目录。把宿主项目挂载到 `/workspace` 后，由管理员设置 `codex.defaultWorkingDirectory: /workspace`。调用请求不接受工作目录，不要把宿主 Windows 路径写入 Linux 容器配置。
+容器内通过 Compose 环境变量指定 `CODEX_DATA_DIR=/data/production-service`、`CODEX_INVOCATION_LOG_DIR=/data/production-invocation-logs`、`CODEX_HOME=/data/codex-home` 和 `CODEX_WORKSPACE=/workspace`。调用请求不接受工作目录，不要把宿主 Windows 路径写入 Linux 容器配置。
 
 部署账户、宿主挂载、Docker socket、SSH 凭据和网络由调用方按所需能力配置。容器自身的回环地址不是宿主代理地址，代理和远端 MCP 可达性需独立配置。
 

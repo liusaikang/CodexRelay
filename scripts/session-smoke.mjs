@@ -23,14 +23,15 @@ const submissions = [];
 const resumptions = [];
 try {
   const page = await browser.newPage();
+  await page.context().addCookies([{ name: 'codex_console', value: 'session-smoke-session', url: 'http://127.0.0.1:8787/' }]);
   page.on('pageerror', error => errors.push(error.message));
   await page.route('**/*', async route => {
     const url = new URL(route.request().url()), path = url.pathname;
     const json = data => route.fulfill({ json: data });
     if (path === '/') return route.fulfill({ contentType: 'text/html; charset=utf-8', body: html });
     if (path === '/assets/lucide.js') return route.fulfill({ contentType: 'application/javascript', body: icons });
-    if (path === '/console/session') return json({ token: 'session-fixture-token' });
-    assert.equal(route.request().headers().authorization, 'Bearer session-fixture-token');
+    if (path === '/console/session') return json({ username: 'admin' });
+    assert.ok(route.request().headers().cookie?.includes('codex_console=session-smoke-session'));
     if (path === '/v1/admin/account') return json({ available: true, authenticated: false });
     if (path === '/v1/info') return json({ runner: 'codex', maxConcurrent: 3, maxQueued: 100, defaultWorkingDirectory: '/workspace/example' });
     if (path === '/v1/health') return json({ ready: true, running: 1, queued: 1, receiving: 2, blocked: 1, runner: 'codex' });

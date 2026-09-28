@@ -5,7 +5,7 @@
 ## 配置与执行
 
 - 服务配置为 `dataDir`、`server`、`tasks`、`runner`、`codex`，已移除旧项目、能力、提示文件和 skillFiles 路由结构。
-- 默认数据目录为 `../data/native-service`；tasks 默认并发 10、队列 100、超时 600 秒。
+- 开发数据目录为 `../data/native-logs-preview`，生产数据目录由 `CODEX_DATA_DIR` 指定；tasks 默认队列 100、超时 600 秒，开发并发 10、生产并发 3。
 - `codex` 包含专用 home、默认工作目录、默认模型、默认推理强度、环境白名单和可选 CLI 路径；CLI 相对路径以配置文件目录为基准解析。
 - 执行固定 `danger-full-access`、approval never、network enabled、实时 Web 搜索开启，不开放请求级 sandbox 覆盖。
 - Runner 在完成、取消或超时时，均等待执行进程真正退出后才释放并发名额。

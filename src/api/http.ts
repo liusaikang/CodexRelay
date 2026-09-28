@@ -1,5 +1,5 @@
 import express, { type ErrorRequestHandler } from 'express';
-import { createHash, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z, ZodError } from 'zod';
@@ -14,7 +14,27 @@ export function createHttpApp(service: TaskService, token: string, accountStatus
   const app = express();
   app.disable('x-powered-by');
   const tokenHash = createHash('sha256').update(`Bearer ${token}`).digest();
-  const isLoopback = (address?: string) => address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1';
+  const consoleSessions = new Map<string, { username: string; expiresAt: number }>();
+  const loginFailures = new Map<string, { count: number; until: number }>();
+  const cookieName = 'codex_console';
+  const sessionLifetimeMs = 8 * 60 * 60 * 1000;
+  const secureCookie = !['127.0.0.1', '::1'].includes(service.config.host);
+  const cookieOptions = `Path=/; HttpOnly; SameSite=Strict${secureCookie ? '; Secure' : ''}`;
+  const credentials = service.config.consoleAuth;
+  const sessionId = (req: express.Request) => req.get('cookie')?.split(';').map(part => part.trim())
+    .find(part => part.startsWith(`${cookieName}=`))?.slice(cookieName.length + 1);
+  const consoleSession = (req: express.Request) => {
+    const id = sessionId(req);
+    if (!id) return undefined;
+    const session = consoleSessions.get(id);
+    if (session && session.expiresAt <= Date.now()) { consoleSessions.delete(id); return undefined; }
+    return session;
+  };
+  const sameOriginPost = (req: express.Request) => {
+    const origin = req.get('origin');
+    return !!origin && (origin === `${req.protocol}://${req.get('host')}` || service.config.allowedOrigins.includes(origin));
+  };
+  const matches = (left: string, right: string) => timingSafeEqual(createHash('sha256').update(left).digest(), createHash('sha256').update(right).digest());
   app.use((req, res, next) => {
     const host = req.hostname.toLowerCase();
     if (!service.config.allowedHosts.map(value => value.toLowerCase()).includes(host)) {
@@ -29,13 +49,31 @@ export function createHttpApp(service: TaskService, token: string, accountStatus
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
     res.setHeader('X-Frame-Options', 'DENY');
+    if (req.method === 'GET' && req.path === '/login') {
+      if (consoleSession(req)) { res.redirect('/'); return; }
+      res.sendFile(fileURLToPath(new URL('../../public/login.html', import.meta.url))); return;
+    }
+    if (req.path === '/console/login' && req.method === 'POST') {
+      if (!sameOriginPost(req)) { res.status(403).json({ error: { code: 'ORIGIN_DENIED', message: 'Same-origin request required' } }); return; }
+      next(); return;
+    }
+    if (req.path === '/console/logout' && req.method === 'POST') {
+      if (!sameOriginPost(req)) { res.status(403).json({ error: { code: 'ORIGIN_DENIED', message: 'Same-origin request required' } }); return; }
+      const id = sessionId(req);
+      if (id) consoleSessions.delete(id);
+      res.setHeader('Set-Cookie', `${cookieName}=; ${cookieOptions}; Max-Age=0`);
+      res.status(204).end(); return;
+    }
     if (req.method === 'GET' && (req.path === '/' || req.path === '/console')) {
+      if (!consoleSession(req)) { res.redirect('/login'); return; }
       res.sendFile(fileURLToPath(new URL('../../public/index.html', import.meta.url))); return;
     }
     if (req.method === 'GET' && req.path === '/assets/lucide.js') {
+      if (!consoleSession(req)) { res.status(401).end(); return; }
       res.sendFile(fileURLToPath(new URL('../../node_modules/lucide/dist/umd/lucide.js', import.meta.url))); return;
     }
     if (req.method === 'GET' && req.path === '/assets/invocations.js') {
+      if (!consoleSession(req)) { res.status(401).end(); return; }
       res.sendFile(fileURLToPath(new URL('../../public/invocations.js', import.meta.url))); return;
     }
     if (req.method === 'GET' && req.path === '/favicon.ico') { res.status(204).end(); return; }
@@ -44,17 +82,39 @@ export function createHttpApp(service: TaskService, token: string, accountStatus
       res.status(ready ? 200 : 503).json({ ready }); return;
     }
     if (req.path === '/console/session' && req.method === 'GET') {
-      const forwarded = Object.keys(req.headers).some(key => key === 'forwarded' || key.startsWith('x-forwarded-') || key === 'x-real-ip');
-      if (!service.config.localConsole || !isLoopback(req.socket.remoteAddress) || !['localhost', '127.0.0.1', '[::1]'].includes(host) || forwarded) {
-        res.status(403).json({ error: { code: 'LOCAL_CONSOLE_ONLY', message: 'Automatic console authentication is disabled or this is not a direct local connection.' } }); return;
-      }
-      res.json({ token, runner: service.health().runner }); return;
+      const session = consoleSession(req);
+      if (!session) { res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Console login required' } }); return; }
+      res.json({ username: session.username, runner: service.health().runner }); return;
     }
     const supplied = createHash('sha256').update(req.get('authorization') ?? '').digest();
-    if (!timingSafeEqual(supplied, tokenHash)) {
+    const bearerValid = timingSafeEqual(supplied, tokenHash);
+    const browserSession = req.path === '/mcp' ? undefined : consoleSession(req);
+    if (!bearerValid && !browserSession) {
       res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Valid bearer token required' } }); return;
     }
+    if (!bearerValid && browserSession && !['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !sameOriginPost(req)) {
+      res.status(403).json({ error: { code: 'ORIGIN_DENIED', message: 'Same-origin request required' } }); return;
+    }
     next();
+  });
+  app.post('/console/login', express.json({ limit: '4kb' }), (req, res) => {
+    const input = z.object({ username: z.string(), password: z.string() }).strict().safeParse(req.body);
+    if (!input.success) { res.status(400).json({ error: { code: 'INVALID_INPUT', message: 'Username and password required' } }); return; }
+    const ip = req.socket.remoteAddress ?? 'unknown';
+    const attempts = loginFailures.get(ip);
+    if (attempts && attempts.until > Date.now() && attempts.count >= 5) {
+      res.status(429).json({ error: { code: 'LOGIN_RATE_LIMITED', message: 'Too many login attempts. Try again later.' } }); return;
+    }
+    if (!credentials || !matches(input.data.username, credentials.username) || !matches(input.data.password, credentials.password)) {
+      const active = attempts && attempts.until > Date.now() ? attempts : { count: 0, until: Date.now() + 15 * 60 * 1000 };
+      active.count++; loginFailures.set(ip, active);
+      res.status(401).json({ error: { code: 'INVALID_CREDENTIALS', message: 'Username or password incorrect' } }); return;
+    }
+    loginFailures.delete(ip);
+    const id = randomBytes(32).toString('hex');
+    consoleSessions.set(id, { username: credentials.username, expiresAt: Date.now() + sessionLifetimeMs });
+    res.setHeader('Set-Cookie', `${cookieName}=${id}; ${cookieOptions}; Max-Age=${sessionLifetimeMs / 1000}`);
+    res.json({ username: credentials.username });
   });
   app.use(express.json({ limit: '128kb' }));
   const pagination = (query: unknown) => {

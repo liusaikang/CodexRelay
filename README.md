@@ -4,7 +4,7 @@
 
 网关不维护 capability 路由，不扫描或拼接 skill 内容，也不按问题选择 skill。一个实例使用一个共享 Token，面向同一可信后端域，不提供复杂 RBAC 或多租户隔离。
 
-当前实现包括原生 SDK 执行、HTTP/MCP/stdio 接入和示例客户端。`npm run verify` 已通过 34 项测试，覆盖 SDK 替身、HTTP、MCP、stdio 和旧记录兼容；部署与真实执行的证据及限制见 [验收记录](docs/verification.md)。
+当前实现包括原生 SDK 执行、HTTP/MCP/stdio 接入和示例客户端。测试覆盖 SDK 替身、HTTP、MCP、stdio、控制台登录与调度恢复；部署与真实执行的证据及限制见 [验收记录](docs/verification.md)。
 
 ## 核心约定
 
@@ -12,7 +12,7 @@
 - 工作目录、模型和推理强度由服务配置统一控制，不接受调用方覆盖。`context` 是最大 16 KiB 的 JSON 对象，作为本次任务的参考数据保存并交给 Codex。
 - 默认最多并发 10 个任务、等待 100 个任务，执行超时 600 秒；同会话始终串行。
 - 执行固定 `danger-full-access`、approval `never`、network enabled、实时 Web 搜索开启。API 不能覆盖；调用方通过接入鉴权、部署账户、容器和外部系统凭据控制实际边界。
-- 新任务和会话记录使用 `version: 2`，默认保存在 `data/native-service`。旧 v1 记录可查询，旧会话不能继续，旧 queued 任务不会重跑；不删除旧数据。
+- 新任务和会话记录使用 `version: 2`。开发环境固定保存在 `data/native-logs-preview`，生产环境由 `CODEX_DATA_DIR` 指定独立目录；切换环境不会搬迁数据。
 - HTTP、MCP Streamable HTTP 与 stdio 共享任务语义。HTTP/MCP 使用 Bearer Token，stdio 依赖本机进程权限。
 
 ## 启动
@@ -23,17 +23,17 @@
 npm ci
 npm run init:env
 npm run build
-npm run config:check
-npm run start:env
+npm run check:dev
+npm run start:dev
 ```
 
-启动前确认配置已按 [新配置结构](docs/configuration.md) 迁移。`init:env` 生成服务访问令牌；模型认证另用 `CODEX_API_KEY` 或专用 Codex home 登录。API Key、代理和远端工具凭据只由部署环境注入，不写入仓库。
+`npm start` 和旧命令 `npm run start:env` 均等同于 `npm run start:dev`。生产环境先在 `.env` 中设置独立的 `CODEX_DATA_DIR`、`CODEX_INVOCATION_LOG_DIR`、`CODEX_HOME`、`CODEX_WORKSPACE`、`CODEX_CONSOLE_USERNAME`、`CODEX_CONSOLE_PASSWORD`、`CODEX_PUBLIC_HOST` 和 `CODEX_PUBLIC_ORIGIN`，然后运行 `npm run check:prod` 与 `npm run start:prod`；Docker 使用同一份生产配置。不要同时启动共用同一目录的实例。详见 [部署说明](docs/deployment.md)。`init:env` 生成服务访问令牌；模型认证另用 `CODEX_API_KEY` 或专用 Codex home 登录。API Key、代理和远端工具凭据只由部署环境注入，不写入仓库。
 
 `runner: codex` 使用真实模型并消耗额度；`runner: demo` 仅用于离线链路演示，不验证真实模型、原生 skill 发现或沙箱权限。可使用 `config/demo.yaml` 启动 demo。安装依赖不要省略 SDK 所需的平台可选依赖。
 
-默认地址：控制台 `http://127.0.0.1:8787/`，HTTP API `http://127.0.0.1:8787/v1/`，MCP `http://127.0.0.1:8787/mcp`，健康检查 `http://127.0.0.1:8787/healthz`。控制台通过顶部快捷栏提供“账号额度”“Codex 调用”和“调用日志”三个页面，分别用于查看账号及剩余额度、提交真实任务及续接会话、筛选调用记录及查看完整问答。自动取得令牌只适用于显式启用 `server.localConsole` 的直接本机连接；生产必须关闭。
+开发环境默认地址：控制台 `http://127.0.0.1:8787/`，HTTP API `http://127.0.0.1:8787/v1/`，MCP `http://127.0.0.1:8787/mcp`，健康检查 `http://127.0.0.1:8787/healthz`。控制台首次访问跳转登录页；开发环境示例账号为 `admin/admin`，由 `config/development.yaml` 的 `server.consoleAuth` 配置，不能对外使用。生产环境账号密码必须从环境变量提供。登录后可查看额度、提交任务和分析调用日志；浏览器使用独立会话 Cookie，不接收服务 Bearer Token。平台后端及 MCP 仍使用 Bearer Token。
 
-调用日志通过配置中的 `invocationLog.enabled: true` 启用，默认关闭；按日期和任务保存 JSON，默认保留 30 天。关闭日志不影响核心任务持久化。配置、统计口径及数据保留规则见 [调用日志配置](docs/configuration.md#调用日志)。
+两套固定配置均启用调用日志，按日期和任务保存 JSON，保留 30 天。关闭日志不影响核心任务持久化。配置、统计口径及数据保留规则见 [调用日志配置](docs/configuration.md#调用日志)。
 
 ## 提交与追问
 

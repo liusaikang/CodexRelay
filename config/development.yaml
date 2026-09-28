@@ -1,7 +1,7 @@
-# All paths are relative to this file. Restart after editing configuration.
-dataDir: ../data/native-service
+# Local development. Keep this directory to preserve existing sessions and logs.
+dataDir: ../data/native-logs-preview
 invocationLog:
-  enabled: false
+  enabled: true
   directory: ../data/invocation-logs
   retentionDays: 30
 server:
@@ -9,17 +9,19 @@ server:
   port: 8787
   tokenEnv: CODEX_MCP_TOKEN
   localConsole: true
+  consoleAuth:
+    username: admin
+    password: admin
   allowedHosts: [localhost, 127.0.0.1, '[::1]']
   allowedOrigins: []
 tasks:
   maxConcurrent: 10
   maxQueued: 100
   timeoutSeconds: 600
-  # Maximum waiting time, including turns blocked by a failed predecessor.
   queueTimeoutSeconds: 1800
 runner: codex
 codex:
-  home: ${CODEX_HOME:-../data/codex-home}
+  home: ../data/codex-home
   defaultWorkingDirectory: ../examples/workspace
   defaultModel: ${CODEX_MODEL:-}
   defaultReasoningEffort: ${CODEX_MODEL_REASONING_EFFORT:-}

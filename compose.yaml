@@ -9,13 +9,21 @@ services:
       - "127.0.0.1:${CODEX_MCP_PORT:-8787}:8787"
     environment:
       CODEX_MCP_TOKEN: ${CODEX_MCP_TOKEN:?Run npm run init:env first}
+      CODEX_CONSOLE_USERNAME: ${CODEX_CONSOLE_USERNAME:-admin}
+      CODEX_CONSOLE_PASSWORD: ${CODEX_CONSOLE_PASSWORD:?Set a console password before starting}
+      CODEX_DATA_DIR: /data/production-service
+      CODEX_INVOCATION_LOG_DIR: /data/production-invocation-logs
+      CODEX_HOME: /data/codex-home
+      CODEX_WORKSPACE: /workspace
+      CODEX_BIND_HOST: 0.0.0.0
+      CODEX_PUBLIC_HOST: ${CODEX_PUBLIC_HOST:-codex-mcp}
+      CODEX_PUBLIC_ORIGIN: ${CODEX_PUBLIC_ORIGIN:-http://127.0.0.1:8787}
       CODEX_API_KEY: ${CODEX_API_KEY:-}
       CODEX_MODEL: ${CODEX_MODEL:-}
       CODEX_MODEL_REASONING_EFFORT: ${CODEX_MODEL_REASONING_EFFORT:-}
     volumes:
       - codex-state:/data
-      # Mount the project workspace and set codex.defaultWorkingDirectory to /workspace.
-      # - ./workspace:/workspace
+      - ${CODEX_WORKSPACE_HOST:?Set the host project workspace path}:/workspace
     tmpfs:
       - /tmp:rw,nosuid,nodev,size=256m
     pids_limit: 256

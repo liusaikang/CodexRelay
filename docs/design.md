@@ -60,7 +60,7 @@ service 不扫描 skill、不合并文件为 developer instructions，也不根�
 
 任务接受响应须在持久化后返回。单实例锁防止多个调度器共享文件存储；单文件原子替换不代表多个文件之间具有事务原子性。存储失败不能伪报接受或成功，应停止不安全的调度。
 
-新记录为 `version: 2`，默认 `data/native-service` 与旧目录分开。原生 Codex 线程和认证位于 `codex.home`，备份需同时覆盖两者。历史 v1 任务和会话保留查询，v1 会话不能续接，v1 queued 不能恢复执行，不删除旧数据。默认新目录不自动聚合旧目录历史。
+新记录为 `version: 2`。开发配置固定使用 `data/native-logs-preview`，生产配置使用 `CODEX_DATA_DIR` 指定的独立目录；两者不自动聚合。原生 Codex 线程和认证位于各自的 `codex.home`，备份需同时覆盖任务数据与线程数据。历史 v1 任务和会话保留查询，v1 会话不能续接，v1 queued 不能恢复执行，不删除旧数据。
 
 重启不重跑遗留 running；将其标为中断。仅新 v2 queued 在通过恢复校验后可继续排队，不能把这一行为扩展到 v1。详见 [运维说明](operations.md)。
 

@@ -111,25 +111,56 @@ it('authenticates, validates inputs, rejects browser origins and supports an asy
   expect(final.result.markdown).toContain('未调用 Codex');
 });
 
-it('serves a token-free console and accepts authenticated same-origin browser submissions', async () => {
-  const page = await fetch(`${base}/`);
-  expect(page.status).toBe(200);
-  expect(page.headers.get('content-type')).toContain('text/html');
-  const html = await page.text();
+it('requires a console login, keeps the service token out of browser responses, and revokes logout', async () => {
+  const page = await fetch(`${base}/`, { redirect: 'manual' });
+  expect(page.status).toBe(302);
+  expect(page.headers.get('location')).toBe('/login');
+  const loginPage = await fetch(`${base}/login`);
+  expect(loginPage.status).toBe(200);
+  expect(await loginPage.text()).toContain('登录');
+  expect((await fetch(`${base}/assets/invocations.js`)).status).toBe(401);
+  expect((await fetch(`${base}/console/session`)).status).toBe(401);
+  const login = async (password: string) => fetch(`${base}/console/login`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base },
+    body: JSON.stringify({ username: 'admin', password }),
+  });
+  expect((await fetch(`${base}/console/login`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: 'admin', password: 'admin' }),
+  })).status).toBe(403);
+  expect((await login('wrong')).status).toBe(401);
+  const signedIn = await login('admin');
+  expect(signedIn.status).toBe(200);
+  const cookie = signedIn.headers.get('set-cookie')!.split(';')[0];
+  expect(cookie).toMatch(/^codex_console=/);
+  expect(signedIn.headers.get('set-cookie')).toContain('HttpOnly');
+  expect(signedIn.headers.get('set-cookie')).toContain('SameSite=Strict');
+  const consoleHeaders = { Cookie: cookie };
+  expect((await fetch(`${base}/mcp`, { method: 'POST', headers: consoleHeaders, body: '{}' })).status).toBe(401);
+  const consolePage = await fetch(`${base}/`, { headers: consoleHeaders });
+  expect(consolePage.status).toBe(200);
+  const html = await consolePage.text();
   expect(html).toContain('CodexRelay');
   expect(html).toContain('账号额度');
   expect(html).not.toContain(token);
-  const logScript = await fetch(`${base}/assets/invocations.js`);
+  const logScript = await fetch(`${base}/assets/invocations.js`, { headers: consoleHeaders });
   expect(logScript.status).toBe(200);
   expect(logScript.headers.get('content-type')).toContain('javascript');
   expect(await logScript.text()).not.toContain(token);
-  const session = await fetch(`${base}/console/session`);
+  const session = await fetch(`${base}/console/session`, { headers: consoleHeaders });
   expect(session.status).toBe(200);
-  expect(await session.json()).toMatchObject({ token, runner: 'demo' });
+  expect(await session.json()).toMatchObject({ username: 'admin', runner: 'demo' });
+  expect(await (await fetch(`${base}/console/session`, { headers: consoleHeaders })).text()).not.toContain(token);
   expect((await fetch(`${base}/data/demo-access.json`)).status).toBe(401);
   const body = JSON.stringify({ question: 'Browser request' });
   expect((await fetch(`${base}/v1/tasks`, { method: 'POST', headers: { ...headers, Origin: base }, body })).status).toBe(202);
   expect((await fetch(`${base}/v1/tasks`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base }, body })).status).toBe(401);
+  expect((await fetch(`${base}/v1/tasks`, { method: 'POST', headers: { ...consoleHeaders, Origin: 'https://untrusted.example', 'Content-Type': 'application/json' }, body })).status).toBe(403);
+  expect((await fetch(`${base}/v1/tasks`, { method: 'POST', headers: { ...consoleHeaders, 'Content-Type': 'application/json' }, body })).status).toBe(403);
+  expect((await fetch(`${base}/v1/tasks`, { method: 'POST', headers: { ...consoleHeaders, Origin: base, 'Content-Type': 'application/json' }, body })).status).toBe(202);
+  const logout = await fetch(`${base}/console/logout`, { method: 'POST', headers: { ...consoleHeaders, Origin: base } });
+  expect(logout.status).toBe(204);
+  expect((await fetch(`${base}/console/session`, { headers: consoleHeaders })).status).toBe(401);
 });
 
 it('serves discovery, submission, follow-up and errors to the official MCP client', async () => {
@@ -155,15 +186,15 @@ it('serves discovery, submission, follow-up and errors to the official MCP clien
   } finally { await client.close(); }
 });
 
-it('does not disclose the service token when local console access is disabled or forwarded', async () => {
+it('does not disclose the service token through console routes', async () => {
   for (const forwarded of [{ Forwarded: 'for=203.0.113.1' }, { 'X-Forwarded-For': '203.0.113.1' }]) {
     const response = await fetch(`${base}/console/session`, { headers: forwarded });
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(401);
     expect(await response.text()).not.toContain(token);
   }
   Object.assign(service.config, { localConsole: false });
   const response = await fetch(`${base}/console/session`);
-  expect(response.status).toBe(403);
+  expect(response.status).toBe(401);
   expect(await response.text()).not.toContain(token);
   expect((await fetch(`${base}/v1/health`, { headers })).status).toBe(200);
 });

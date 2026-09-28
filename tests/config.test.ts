@@ -5,14 +5,43 @@ import { join, resolve } from 'node:path';
 import { parse, stringify } from 'yaml';
 import { loadConfig } from '../src/config.js';
 
-it('loads native Codex defaults without importing skill or prompt contents', async () => {
-  const config = await loadConfig(resolve('config/default.yaml'));
+it('loads the development environment with its existing history and invocation log', async () => {
+  const config = await loadConfig(resolve('config/development.yaml'));
   expect(config.defaultWorkingDirectory).toBe(await realpath('examples/workspace'));
   expect(config).not.toHaveProperty('capabilities');
   expect(config).not.toHaveProperty('projects');
-  expect(config.invocationLog).toMatchObject({ enabled: false, retentionDays: 30 });
+  expect(config.dataDir).toBe(resolve('data/native-logs-preview'));
+  expect(config.codexHome).toBe(resolve('data/codex-home'));
+  expect(config.invocationLog).toMatchObject({ enabled: true, directory: resolve('data/invocation-logs'), retentionDays: 30 });
   expect(config.queueTimeoutSeconds).toBe(1800);
-  expect(config.maxConcurrent).toBe(parse(await readFile('config/default.yaml', 'utf8')).tasks.maxConcurrent);
+  expect(config.consoleAuth).toEqual({ username: 'admin', password: 'admin' });
+  expect(config.maxConcurrent).toBe(parse(await readFile('config/development.yaml', 'utf8')).tasks.maxConcurrent);
+});
+
+it('requires separate production paths and credentials', async () => {
+  const names = ['CODEX_DATA_DIR', 'CODEX_INVOCATION_LOG_DIR', 'CODEX_HOME', 'CODEX_WORKSPACE', 'CODEX_CONSOLE_USERNAME', 'CODEX_CONSOLE_PASSWORD', 'CODEX_BIND_HOST', 'CODEX_PUBLIC_HOST', 'CODEX_PUBLIC_ORIGIN'];
+  const original = Object.fromEntries(names.map(name => [name, process.env[name]]));
+  const dir = await mkdtemp(join(tmpdir(), 'relay-production-config-'));
+  try {
+    for (const name of names) delete process.env[name];
+    await expect(loadConfig(resolve('config/production.yaml'))).rejects.toThrow();
+    Object.assign(process.env, {
+      CODEX_DATA_DIR: join(dir, 'state'), CODEX_INVOCATION_LOG_DIR: join(dir, 'logs'), CODEX_HOME: join(dir, 'home'), CODEX_WORKSPACE: dir,
+      CODEX_CONSOLE_USERNAME: 'operator', CODEX_CONSOLE_PASSWORD: 'test-only-password', CODEX_BIND_HOST: '127.0.0.1',
+      CODEX_PUBLIC_HOST: 'relay.example.test', CODEX_PUBLIC_ORIGIN: 'https://relay.example.test',
+    });
+    expect(await loadConfig(resolve('config/production.yaml'))).toMatchObject({
+      dataDir: join(dir, 'state'), invocationLog: { enabled: true, directory: join(dir, 'logs') },
+      codexHome: join(dir, 'home'), defaultWorkingDirectory: await realpath(dir),
+      host: '127.0.0.1', consoleAuth: { username: 'operator', password: 'test-only-password' },
+      allowedHosts: expect.arrayContaining(['relay.example.test']), allowedOrigins: ['https://relay.example.test'],
+    });
+  } finally {
+    for (const name of names) {
+      if (original[name] === undefined) delete process.env[name]; else process.env[name] = original[name];
+    }
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
 it('validates invocation retention and keeps its directory separate from runtime state', async () => {

@@ -48,6 +48,7 @@ export interface RuntimeConfig {
   invocationLog?: { enabled: boolean; directory: string; retentionDays: number };
   dataDir: string; codexHome: string; host: string; port: number;
   tokenEnv: string; localConsole?: boolean; allowedHosts: string[]; allowedOrigins: string[];
+  consoleAuth?: { username: string; password: string };
   maxConcurrent: number; maxQueued: number; runner: 'codex' | 'demo';
   envAllowlist: string[]; codexPath?: string;
   timeoutSeconds: number; queueTimeoutSeconds?: number; defaultWorkingDirectory: string;

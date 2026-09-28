@@ -17,9 +17,9 @@ COPY package.json ./
 COPY public ./public
 COPY config ./config
 COPY examples/workspace ./examples/workspace
-RUN mkdir -p /data/home /data/native-service /data/codex-home && chown -R node:node /data
+RUN mkdir -p /data/home /data/production-service /data/production-invocation-logs /data/codex-home && chown -R node:node /data
 USER node
 EXPOSE 8787
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:8787/healthz',{signal:AbortSignal.timeout(3000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
-CMD ["node", "dist/main.js", "--config", "config/docker.yaml"]
+CMD ["node", "dist/main.js", "--config", "config/production.yaml"]

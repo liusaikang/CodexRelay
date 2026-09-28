@@ -64,13 +64,13 @@ Content-Type: application/json
 异常退出先只读检查：
 
 ```sh
-node dist/main.js --config config/default.yaml --inspect-lock
+node dist/main.js --config config/development.yaml --inspect-lock
 ```
 
 确认旧主进程、worker 及其子进程都停止后，才能执行：
 
 ```sh
-node dist/main.js --config config/default.yaml --recover-lock --confirm-workers-stopped
+node dist/main.js --config config/development.yaml --recover-lock --confirm-workers-stopped
 ```
 
 恢复只接受同主机且 PID 确认不存在的锁，备份后移除，不删除任务、会话或 Codex 数据。活跃进程、其他主机、损坏锁、无法确认的 PID 均拒绝。容器主机名或 PID 命名空间变化需管理员在宿主机核实，不可强制绕过。

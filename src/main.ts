@@ -1,6 +1,6 @@
 import { parseArgs } from 'node:util';
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { loadConfig } from './config.js';
 import { FileStore, inspectStoreLock, recoverStoreLock } from './storage.js';
@@ -12,7 +12,7 @@ import { createMcpServer } from './api/mcp.js';
 import { AccountInspector, CodexAppServerGateway } from './account.js';
 
 const { values } = parseArgs({ options: {
-  config: { type: 'string', default: 'config/default.yaml' },
+  config: { type: 'string', default: 'config/development.yaml' },
   transport: { type: 'string', default: 'http' },
   check: { type: 'boolean', default: false },
   'inspect-lock': { type: 'boolean', default: false },
@@ -30,7 +30,8 @@ async function main() {
   const token = process.env[config.tokenEnv] ?? '';
   if (values.transport === 'http' && token.length < 24) throw new Error(`Set ${config.tokenEnv} to a random secret of at least 24 characters`);
   if (values.check) {
-    console.log(JSON.stringify({ valid: true, runner: config.runner, maxConcurrent: config.maxConcurrent, maxQueued: config.maxQueued,
+    console.log(JSON.stringify({ valid: true, configFile: resolve(values.config!), dataDir: config.dataDir,
+      invocationLog: config.invocationLog?.enabled === true, runner: config.runner, maxConcurrent: config.maxConcurrent, maxQueued: config.maxQueued,
       queueTimeoutSeconds: config.queueTimeoutSeconds, timeoutSeconds: config.timeoutSeconds,
       defaultWorkingDirectory: config.defaultWorkingDirectory, localConsole: !!config.localConsole,
       modelAuthentication: process.env.CODEX_API_KEY && config.envAllowlist.includes('CODEX_API_KEY') ? 'api-key-present-not-validated' : existsSync(join(config.codexHome, 'auth.json')) ? 'auth-file-present-not-validated' : 'not-detected',
@@ -66,7 +67,7 @@ async function main() {
       });
       const address = server.address();
       const port = typeof address === 'object' && address ? address.port : config.port;
-      console.error(`CodexMCP listening on http://${config.host}:${port}/mcp (${config.runner} runner)`);
+      console.error(`CodexMCP listening on http://${config.host}:${port}/mcp (${config.runner} runner; config: ${resolve(values.config!)})`);
     }
     process.once('SIGTERM', () => { void shutdown().catch(() => { process.exitCode = 1; }); });
     process.once('SIGINT', () => { void shutdown().catch(() => { process.exitCode = 1; }); });

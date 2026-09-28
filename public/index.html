@@ -37,7 +37,7 @@
 <body>
   <header>
     <div class="brand"><div class="mark"><i data-lucide="waypoints"></i></div><div><h1>CodexRelay</h1><span class="subtitle">Codex 服务控制台</span></div></div>
-    <div id="service-status" class="service-status"><span class="status-dot"></span><span id="service-label">正在连接</span></div>
+    <div class="row"><div id="service-status" class="service-status"><span class="status-dot"></span><span id="service-label">正在连接</span></div><button type="button" id="logout" class="icon" title="退出登录" aria-label="退出登录"><i data-lucide="log-out"></i></button></div>
   </header>
   <nav class="quick-nav" aria-label="快捷栏">
     <button type="button" data-view="account-view" aria-current="page"><i data-lucide="gauge"></i>账号额度</button>
@@ -61,7 +61,7 @@
   <section id="task-view" class="view hidden">
     <section class="connection-strip" aria-label="Codex 服务连接">
       <div class="field"><label for="endpoint">服务地址</label><input id="endpoint" class="mono" readonly></div>
-      <div class="field"><label for="auth-source">认证来源</label><input id="auth-source" value="由服务环境变量 CODEX_MCP_TOKEN 自动提供" readonly></div>
+      <div class="field"><label for="auth-source">认证来源</label><input id="auth-source" value="控制台登录会话" readonly></div>
       <button type="button" id="reconnect"><i data-lucide="plug-zap"></i>重新连接</button>
     </section>
     <section class="ops-health" aria-label="服务调度状态"><span>接收中 <strong id="health-receiving">—</strong></span><span>运行中 <strong id="health-running">—</strong></span><span>排队中 <strong id="health-queued">—</strong></span><span>待确认 <strong id="health-blocked">—</strong></span><span id="health-capacity" class="muted">并发上限 — · 队列上限 —</span><span id="health-updated" class="muted">尚未读取</span><span id="health-error" class="error hidden" role="status"></span></section>
@@ -115,7 +115,7 @@
     'use strict';
     const $ = id => document.getElementById(id);
     window.lucide?.createIcons();
-    let token = '', serviceInfo = null, submitting = false, taskReady = false;
+    let serviceInfo = null, submitting = false, taskReady = false;
     let selectedSession = '', viewEpoch = 0, historyOffset = 0, totalTurns = 0, refreshEpoch = null, monitorTimer;
     let sessionsOffset = 0, sessionsTotal = 0, sessionListEpoch = 0;
     const turnRows = new Map();
@@ -137,16 +137,18 @@
       }
     }
     async function api(path, options = {}) {
-      const response = await fetch(path, {...options, headers:{Authorization:'Bearer ' + token,...(options.body ? {'Content-Type':'application/json'} : {})},signal:AbortSignal.timeout(15000)});
+      const response = await fetch(path, {...options, headers:{...(options.body ? {'Content-Type':'application/json'} : {})},signal:AbortSignal.timeout(15000)});
       const body = await response.json();
+      if (response.status === 401) { location.assign('/login'); throw new Error('登录已过期'); }
       if (!response.ok) { const error = new Error(body.error?.message || '请求失败'); error.status = response.status; throw error; }
       return body;
     }
     async function bootstrap() {
       const response = await fetch('/console/session', {signal:AbortSignal.timeout(15000)});
       const body = await response.json();
-      if (!response.ok || typeof body.token !== 'string') throw new Error('无法取得控制台访问令牌');
-      token = body.token; serviceStatus('已连接','online');
+      if (response.status === 401) { location.assign('/login'); throw new Error('请先登录控制台'); }
+      if (!response.ok || typeof body.username !== 'string') throw new Error('无法确认控制台登录状态');
+      serviceStatus('已连接','online');
     }
     function setQuota(prefix, quota) {
       const remaining = typeof quota?.remainingPercent === 'number' ? Math.max(0,Math.min(100,quota.remainingPercent)) : null;
@@ -425,6 +427,11 @@
     };
     $('refresh-account').onclick = () => { void loadAccount(true); };
     $('reconnect').onclick = () => { void reconnectTaskConsole(); };
+    $('logout').onclick = async () => {
+      $('logout').disabled = true;
+      try { await fetch('/console/logout', {method:'POST'}); }
+      finally { location.assign('/login'); }
+    };
     for (const button of document.querySelectorAll('.quick-nav button')) button.onclick = () => showView(button.dataset.view);
     $('endpoint').value = location.origin;
     if (location.protocol === 'file:') { serviceStatus('打开方式错误','error'); message('account-message','请通过 CodexRelay 服务地址打开此页面。'); }

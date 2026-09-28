@@ -31,7 +31,7 @@ webSearchMode: live
 
 ## 接入与秘密管理
 
-`server.tokenEnv` 只保存环境变量名。跨网络访问使用 HTTPS，并配置准确的 `allowedHosts` 和 `allowedOrigins`。默认关闭 `server.localConsole`；自动取得令牌仅用于显式启用后的直接回环调试，生产不能通过代理公开。
+`server.tokenEnv` 只保存环境变量名。跨网络访问使用 HTTPS，并配置准确的 `allowedHosts` 和 `allowedOrigins`。网页控制台使用独立的账号密码和进程内会话 Cookie，不向浏览器返回服务令牌；`localConsole` 不再提供自动取令牌功能。仓库本机示例的 `admin/admin` 仅限临时回环调试，部署前必须换成强密码，Docker 配置要求环境变量提供密码。
 
 模型认证、代理和上游工具凭据由部署环境或秘密管理系统注入，只将任务确实需要的变量列入 `codex.envAllowlist`。不要把网关共享 Token 传给 Codex 工具，也不要将真实凭据写入仓库、示例、问题或 `context`。
 

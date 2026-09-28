@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>登录 · CodexRelay</title>
+  <style>
+    :root{color-scheme:light;--ink:#252b2a;--muted:#64736c;--line:#dce5df;--green:#08775c;--red:#a93a38}
+    *{box-sizing:border-box;letter-spacing:0}
+    body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f3f7f5;color:var(--ink);font:14px/1.6 "Segoe UI","Microsoft YaHei",sans-serif}
+    main{width:min(400px,calc(100% - 32px));padding:32px;background:#fff;border:1px solid var(--line);border-radius:8px}
+    .brand{display:flex;align-items:center;gap:12px;margin-bottom:30px}.mark{width:36px;height:36px;border-radius:6px;background:var(--green);color:white;display:grid;place-items:center;font-size:21px;font-weight:700}h1{font-size:21px;line-height:1.2;margin:0}.subtitle{color:var(--muted);font-size:12px}
+    label{display:block;font-size:12px;font-weight:600;color:#52615a;margin:18px 0 6px}input{width:100%;height:42px;border:1px solid #cbd8d0;border-radius:6px;padding:9px 11px;font:inherit;color:var(--ink)}input:focus,button:focus-visible{outline:2px solid #69af96;outline-offset:2px}
+    button{width:100%;height:42px;margin-top:26px;border:1px solid var(--green);border-radius:6px;background:var(--green);color:white;font:inherit;font-weight:600;cursor:pointer}button:hover:not(:disabled){background:#05624c}button:disabled{opacity:.6;cursor:wait}.error{min-height:20px;margin:10px 0 0;color:var(--red);font-size:12px}
+  </style>
+</head>
+<body>
+  <main>
+    <div class="brand"><div class="mark">C</div><div><h1>CodexRelay</h1><div class="subtitle">服务控制台</div></div></div>
+    <form id="login-form">
+      <label for="username">账号</label><input id="username" name="username" autocomplete="username" required autofocus>
+      <label for="password">密码</label><input id="password" name="password" type="password" autocomplete="current-password" required>
+      <p class="error" id="login-error" role="alert" aria-live="polite"></p>
+      <button id="submit" type="submit">登录</button>
+    </form>
+  </main>
+  <script>
+    document.getElementById('login-form').addEventListener('submit',async event=>{
+      event.preventDefault();
+      const button=document.getElementById('submit'),error=document.getElementById('login-error');
+      button.disabled=true;error.textContent='';
+      try{
+        const response=await fetch('/console/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:document.getElementById('username').value,password:document.getElementById('password').value})});
+        if(!response.ok){const result=await response.json();throw new Error(result.error?.message||'登录失败');}
+        location.replace('/');
+      }catch(cause){error.textContent=cause.message||'无法连接服务';button.disabled=false;}
+    });
+  </script>
+</body>
+</html>
