@@ -49,6 +49,35 @@ it('serves protected account status and supports a forced refresh', async () => 
   expect(refreshed.quota.primary.remainingPercent).toBe(59);
 });
 
+it('limits live settings to the console session and applies validated changes', async () => {
+  const url = `${base}/console/settings`;
+  expect((await fetch(url)).status).toBe(401);
+  expect((await fetch(`${base}/assets/settings.js`)).status).toBe(401);
+  expect((await fetch(url, { headers })).status).toBe(403);
+  const login = await fetch(`${base}/console/login`, {
+    method: 'POST', headers: { Origin: base, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: 'admin', password: 'admin' }),
+  });
+  const cookie = login.headers.get('set-cookie')!.split(';')[0]!;
+  expect((await fetch(`${base}/assets/settings.js`, { headers: { Cookie: cookie } })).status).toBe(200);
+  const browserHeaders = { Cookie: cookie, Origin: base, 'Content-Type': 'application/json' };
+  const original = await (await fetch(url, { headers: browserHeaders })).json();
+  expect(original).toMatchObject({ revision: 0, settings: { invocationLog: { enabled: true } } });
+  expect(JSON.stringify(original)).not.toContain(token);
+  const settings = { ...original.settings, maxConcurrent: 3 };
+  expect((await fetch(url, { method: 'PUT', headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ revision: 0, settings }) })).status).toBe(403);
+  expect((await fetch(url, { method: 'PUT', headers, body: JSON.stringify({ revision: 0, settings }) })).status).toBe(403);
+  expect((await fetch(url, { method: 'PUT', headers: browserHeaders,
+    body: JSON.stringify({ revision: 0, settings: { ...settings, dataDir: '/secret' } }) })).status).toBe(400);
+  const saved = await fetch(url, { method: 'PUT', headers: browserHeaders, body: JSON.stringify({ revision: 0, settings }) });
+  expect(saved.status).toBe(200);
+  expect(await saved.json()).toMatchObject({ revision: 1, settings: { maxConcurrent: 3 } });
+  expect(service.info().maxConcurrent).toBe(3);
+  expect((await fetch(url, { method: 'PUT', headers: browserHeaders,
+    body: JSON.stringify({ revision: 0, settings }) })).status).toBe(409);
+});
+
 it('requires authentication and an explicit predecessor when resuming a blocked session', async () => {
   const sessionId = 'sess_00000000-0000-4000-8000-000000000000';
   const url = `${base}/v1/sessions/${sessionId}/resume`;

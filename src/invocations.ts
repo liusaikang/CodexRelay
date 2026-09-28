@@ -31,7 +31,9 @@ export class InvocationLog {
   private timer?: NodeJS.Timeout;
   private healthy = true;
   private canonicalRoot?: string;
-  constructor(private config?: InvocationConfig) {}
+  private config?: InvocationConfig;
+  constructor(config?: InvocationConfig) { this.config = config ? { ...config } : undefined; }
+  setConfigBeforeOpen(config?: InvocationConfig) { this.config = config ? { ...config } : undefined; }
   get enabled() { return this.config?.enabled === true; }
   status() { return { enabled: this.enabled, healthy: this.healthy, retentionDays: this.config?.retentionDays ?? 30 }; }
   private async guarded(operation: () => Promise<void>) {
@@ -81,7 +83,19 @@ export class InvocationLog {
     // Only tasks accepted while logging was enabled are reconciled after a restart.
     for (const task of tasks) await this.record(task);
     await this.prune();
-    if (this.enabled) { this.timer = setInterval(() => { void this.prune(); }, 3_600_000); this.timer.unref(); }
+    if (this.enabled) { clearInterval(this.timer); this.timer = setInterval(() => { void this.prune(); }, 3_600_000); this.timer.unref(); }
+  }
+  async reconfigure(settings: Pick<InvocationConfig, 'enabled' | 'retentionDays'>, tasks: Task[]) {
+    const wasEnabled = this.enabled;
+    if (wasEnabled && !settings.enabled) {
+      await this.serial;
+      clearInterval(this.timer);
+      this.timer = undefined;
+    }
+    this.config = { ...this.config!, ...settings };
+    if (!wasEnabled && settings.enabled) await this.open(tasks);
+    else if (settings.enabled) await this.prune();
+    return this.status();
   }
   async record(task: Task) {
     if (!this.enabled || !task.invocationTransport) return;

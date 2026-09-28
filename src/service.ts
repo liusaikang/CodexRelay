@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { resolveWorkingDirectory } from './config.js';
 import { InvocationLog, type InvocationTransport } from './invocations.js';
+import { RuntimeSettingsStore } from './settings.js';
 import { AppError, isTerminal, submitSchema, type Execution, type Runner, type RuntimeConfig, type Session, type Store, type SubmitInput, type Task } from './types.js';
 
 const now = () => new Date().toISOString();
@@ -27,8 +28,10 @@ export class TaskService {
   private fault = false;
   private initialized = false;
   readonly invocations: InvocationLog;
+  private readonly settings: RuntimeSettingsStore;
   constructor(readonly config: RuntimeConfig, private store: Store, private runner: Runner) {
     this.invocations = new InvocationLog(config.invocationLog);
+    this.settings = new RuntimeSettingsStore(config);
   }
   private async saveTask(task: Task) {
     await this.persist(() => this.store.saveTask(task));
@@ -106,6 +109,8 @@ export class TaskService {
   async init() {
     const stored = await this.store.open();
     try {
+      await this.settings.load();
+      this.invocations.setConfigBeforeOpen(this.config.invocationLog);
       for (const session of stored.sessions) this.sessions.set(session.sessionId, session);
       // Migrate legacy tasks once in a deterministic order; new work uses persisted sequence numbers.
       const sequenced = stored.tasks.filter(task => task.enqueueSequence !== undefined);
@@ -370,6 +375,18 @@ export class TaskService {
       defaultReasoningEffort: this.config.defaultReasoningEffort, maxConcurrent: this.config.maxConcurrent, maxQueued: this.config.maxQueued,
       queueTimeoutSeconds: this.config.queueTimeoutSeconds ?? 1800, timeoutSeconds: this.config.timeoutSeconds, admissionLimit: this.admissionLimit,
       accessMode: 'danger-full-access', readOnly: false, networkAccess: true, webSearch: 'live', runner: this.config.runner };
+  }
+  getSettings() { this.readable(); return { ...this.settings.snapshot(), logging: this.invocations.status() }; }
+  async updateSettings(input: unknown, actor: string) {
+    return this.exclusive(async () => {
+      this.available();
+      await this.settings.update(input, actor);
+      const logging = this.config.invocationLog
+        ? await this.invocations.reconfigure(this.config.invocationLog, [...this.tasks.values()])
+        : this.invocations.status();
+      await this.drain();
+      return { ...this.settings.snapshot(), logging };
+    });
   }
   health() { return { ready: this.initialized && !this.closing && !this.fault, running: this.active.size, queued: this.pending.size,
     receiving: this.receiving, admissionLimit: this.admissionLimit, blocked: [...this.pending.values()].filter(task => this.blocker(task)?.reason === 'previous_task_failed').length, runner: this.config.runner }; }

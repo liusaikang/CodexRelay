@@ -31,7 +31,7 @@ npm run start:dev
 
 `runner: codex` 使用真实模型并消耗额度；`runner: demo` 仅用于离线链路演示，不验证真实模型、原生 skill 发现或沙箱权限。可使用 `config/demo.yaml` 启动 demo。安装依赖不要省略 SDK 所需的平台可选依赖。
 
-开发环境默认地址：控制台 `http://127.0.0.1:8787/`，HTTP API `http://127.0.0.1:8787/v1/`，MCP `http://127.0.0.1:8787/mcp`，健康检查 `http://127.0.0.1:8787/healthz`。控制台首次访问跳转登录页；开发环境示例账号为 `admin/admin`，由 `config/development.yaml` 的 `server.consoleAuth` 配置，不能对外使用。生产环境账号密码必须从环境变量提供。登录后可查看额度、提交任务和分析调用日志；浏览器使用独立会话 Cookie，不接收服务 Bearer Token。平台后端及 MCP 仍使用 Bearer Token。
+开发环境默认地址：控制台 `http://127.0.0.1:8787/`，HTTP API `http://127.0.0.1:8787/v1/`，MCP `http://127.0.0.1:8787/mcp`，健康检查 `http://127.0.0.1:8787/healthz`。控制台首次访问跳转登录页；开发环境示例账号为 `admin/admin`，由 `config/development.yaml` 的 `server.consoleAuth` 配置，不能对外使用。生产环境账号密码必须从环境变量提供。登录后可查看额度、提交任务、分析调用日志并调整可热更新的运行参数；覆盖值持久化在 `dataDir/runtime-settings.json`。端口、目录和凭证仍只通过部署配置调整，详见 [控制台运行配置](docs/configuration.md#控制台运行配置)。浏览器使用独立会话 Cookie，不接收服务 Bearer Token。平台后端及 MCP 仍使用 Bearer Token。
 
 两套固定配置均启用调用日志，按日期和任务保存 JSON，保留 30 天。关闭日志不影响核心任务持久化。配置、统计口径及数据保留规则见 [调用日志配置](docs/configuration.md#调用日志)。
 

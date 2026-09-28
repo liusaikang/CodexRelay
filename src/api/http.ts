@@ -76,6 +76,10 @@ export function createHttpApp(service: TaskService, token: string, accountStatus
       if (!consoleSession(req)) { res.status(401).end(); return; }
       res.sendFile(fileURLToPath(new URL('../../public/invocations.js', import.meta.url))); return;
     }
+    if (req.method === 'GET' && req.path === '/assets/settings.js') {
+      if (!consoleSession(req)) { res.status(401).end(); return; }
+      res.sendFile(fileURLToPath(new URL('../../public/settings.js', import.meta.url))); return;
+    }
     if (req.method === 'GET' && req.path === '/favicon.ico') { res.status(204).end(); return; }
     if (req.path === '/healthz' && req.method === 'GET') {
       const ready = service.health().ready;
@@ -117,6 +121,15 @@ export function createHttpApp(service: TaskService, token: string, accountStatus
     res.json({ username: credentials.username });
   });
   app.use(express.json({ limit: '128kb' }));
+  app.use('/console/settings', (req, res, next) => {
+    if (!consoleSession(req)) { res.status(403).json({ error: { code: 'CONSOLE_ONLY', message: 'Console login required' } }); return; }
+    if (req.method !== 'GET' && !sameOriginPost(req)) {
+      res.status(403).json({ error: { code: 'ORIGIN_DENIED', message: 'Same-origin request required' } }); return;
+    }
+    next();
+  });
+  app.get('/console/settings', (_req, res) => res.json(service.getSettings()));
+  app.put('/console/settings', async (req, res) => res.json(await service.updateSettings(req.body, consoleSession(req)!.username)));
   const pagination = (query: unknown) => {
     const raw = z.object({ offset: z.coerce.number().optional(), limit: z.coerce.number().optional() }).parse(query);
     return pageSchema.parse(raw);
