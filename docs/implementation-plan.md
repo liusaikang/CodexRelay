@@ -7,7 +7,7 @@
 - 服务配置为 `dataDir`、`server`、`tasks`、`runner`、`codex`，已移除旧项目、能力、提示文件和 skillFiles 路由结构。
 - 开发数据目录为 `../data/native-logs-preview`，生产数据目录由 `CODEX_DATA_DIR` 指定；tasks 默认队列 100、超时 600 秒，开发并发 10、生产并发 3。
 - `codex` 包含专用 home、默认工作目录、默认模型、默认推理强度、环境白名单和可选 CLI 路径；CLI 相对路径以配置文件目录为基准解析。
-- 执行固定 `danger-full-access`、approval never、network enabled、实时 Web 搜索开启，不开放请求级 sandbox 覆盖。
+- 请求级 `sandboxMode` 支持 SDK 原生的只读、工作目录可写、完整权限枚举，省略采用服务默认值；approval never、实时 Web 搜索开启。权限范围见接口文档。
 - Runner 在完成、取消或超时时，均等待执行进程真正退出后才释放并发名额。
 
 ## 原生上下文
@@ -34,7 +34,7 @@
 
 ## 验收范围
 
-`npm run verify` 已通过 34 项测试，覆盖 SDK 替身、HTTP、MCP、stdio、四字段提交契约和旧记录兼容。后续变更仍需重新执行类型检查、测试和构建，发布前另行执行 `npm run release:check` 并审查输出。
+`npm run verify` 覆盖 SDK 替身、HTTP、MCP、stdio、四字段提交契约和旧记录兼容。当前结果统一记录在 [验证说明](verification.md)。后续变更仍需重新执行类型检查、测试和构建，发布前另行执行 `npm run release:check` 并审查输出。
 
 真实 SDK、原生上下文装载、shell 文件读取和会话续接需按各自证据判断，不能用替身测试相互代替。Harness 原生装载 skill 正文与 shell 读取 SKILL.md 是不同路径；原生装载成功不能据此推断 shell 读取策略放行。
 

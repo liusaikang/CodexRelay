@@ -22,7 +22,7 @@ npm run start:dev
 
 开发环境固定加载 `config/development.yaml`，继续读取 `data/native-logs-preview` 中的已有会话和 `data/invocation-logs` 中的调用日志。`npm start` 和旧的 `npm run start:env` 也启动开发环境。配置检查只做预检查，不代表模型认证、skill 发现或实际沙箱权限已经通过。
 
-`init:env` 生成随机服务令牌到 `.env`，不要提交该文件。服务 Token 与模型认证不同：使用 `CODEX_API_KEY`，或按 [运维说明](operations.md) 在专用 `codex.home` 登录。`CODEX_MODEL` 和 `CODEX_MODEL_REASONING_EFFORT` 可留空，或作为新会话默认值。
+`init:env` 生成随机服务令牌和生产控制台密码到 `.env`，不会覆盖已有文件。服务 Token 与模型认证不同。开发环境登录专用 home：Linux/macOS 使用 `CODEX_HOME="$PWD/data/codex-home" npx --no-install codex login --device-auth`；PowerShell 使用 `$env:CODEX_HOME = Join-Path (Get-Location) 'data/codex-home'` 后执行 `npx --no-install codex login --device-auth`。生产使用各自的 `CODEX_HOME`，也可提供 `CODEX_API_KEY`。`CODEX_MODEL` 和 `CODEX_MODEL_REASONING_EFFORT` 可留空，或作为新会话默认值。
 
 需要代理时配置 `HTTPS_PROXY` / `HTTP_PROXY`，并在 `codex.envAllowlist` 中允许必要变量。`NO_PROXY` 应包含本机服务地址。不要假定 CLI 自动继承桌面应用或系统代理；Node 环境文件也不会覆盖终端已存在的同名环境变量。
 
@@ -58,17 +58,33 @@ node --env-file=.env dist/main.js --config config/demo.yaml
 
 ## Docker 部署
 
-Dockerfile、Compose 使用 `config/production.yaml`，尚未进行实际构建与运行验收。部署前在未提交的 `.env` 设置强密码 `CODEX_CONSOLE_PASSWORD`、`CODEX_PUBLIC_HOST`、`CODEX_PUBLIC_ORIGIN` 和 `CODEX_WORKSPACE_HOST`（宿主项目绝对路径）；Compose 会将工作目录挂载为 `/workspace`，并将生产任务、调用日志与 Codex home 持久化到独立的 `/data` 子目录。核对认证及代理后执行：
+Dockerfile、Compose 使用 `config/production.yaml`，生产配置和当前 SDK 绑定的 Codex CLI 一起打包。需要 Docker Compose v2、Linux 容器。CI 负责镜像构建与无模型调用的启动检查；本机实际验证范围见 [verification.md](verification.md)。
 
-在已配置模型认证和服务 Token 的部署环境中执行：
+先执行 `npm run init:env` 生成 `.env`。无 Node.js 的部署机可复制 `.env.example` 为 `.env`，自行设置至少 24 字符随机 `CODEX_MCP_TOKEN` 和强控制台密码。既有 `.env` 不会被生成器更新，需手工补齐空值。默认工作目录为合成样例；正式接入时设置 `CODEX_WORKSPACE_HOST` 为宿主机实际项目路径。Windows 路径使用正斜杠，如 `C:/projects/example`。
 
 ```sh
 docker compose build
+docker compose run --rm codex-mcp codex login --device-auth
+docker compose run --rm codex-mcp codex login status
 docker compose run --rm codex-mcp node dist/main.js --config config/production.yaml --check
 docker compose up -d
 docker compose ps
 docker compose logs --tail=100 codex-mcp
 ```
+
+账号登录按终端给出的地址与验证码在浏览器完成。如账号尚未启用设备码登录，先按 CLI 提示处理账号设置；也可配置 API Key。登录状态保存在卷中，可随容器重建保留。网页控制台登录使用 `.env` 中的用户名/密码，不是 ChatGPT 密码。
+
+本机访问 `http://127.0.0.1:8787/`，MCP 地址追加 `/mcp`。修改宿主端口用 `CODEX_MCP_PORT`；若显式设置了 `CODEX_PUBLIC_ORIGIN`，同步修改其中端口。当前 Compose 只发布回环端口。远程浏览器通过 HTTPS 代理或 SSH 本地端口转发访问；服务器监听非回环时 Cookie 带 Secure，不能直接用普通远程 HTTP 登录。不要仅靠放开端口暴露控制台。
+
+无模型调用的容器检查（使用临时目录，不接触业务任务）：
+
+```sh
+docker compose run --rm codex-mcp node scripts/container-smoke.mjs
+```
+
+镜像以 `node` 用户运行；Linux bind mount 应保证 UID 1000 有所需读写权限。文件变更能力还受挂载、宿主 ACL 和所选 Codex 沙箱约束。`.env` 中 `CODEX_SANDBOX_MODE` 支持 `read-only`、`workspace-write`、`danger-full-access`（兼容默认值），修改后重建容器使环境变量生效。只读业务可额外将工作目录挂载设为 `read_only: true`，但 `/data` 仍需写入运行状态。默认不挂载 Docker socket，不内置 SSH 私钥。沙箱模式与远端权限边界见 [配置说明](configuration.md#执行权限)。
+
+正常升级使用 `docker compose stop`、`docker compose build`、`docker compose up -d`。Compose 保留 `restart: "no"`，因为当前异常实例锁需人工检查；强制结束后不要自动删除锁。若锁的 hostname 属于旧容器，先确认旧容器和全部执行进程已停止、备份卷，再由管理员处理旧锁；不能将仍在运行的副本强行解锁。普通升级不要使用 `down -v`。
 
 容器内通过 Compose 环境变量指定 `CODEX_DATA_DIR=/data/production-service`、`CODEX_INVOCATION_LOG_DIR=/data/production-invocation-logs`、`CODEX_HOME=/data/codex-home` 和 `CODEX_WORKSPACE=/workspace`。调用请求不接受工作目录，不要把宿主 Windows 路径写入 Linux 容器配置。
 

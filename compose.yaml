@@ -1,7 +1,7 @@
 services:
   codex-mcp:
     build: .
-    image: codex-task-mcp:local
+    image: codexrelay:local
     init: true
     # A stale instance lock needs inspection after an unclean shutdown.
     restart: "no"
@@ -17,13 +17,18 @@ services:
       CODEX_WORKSPACE: /workspace
       CODEX_BIND_HOST: 0.0.0.0
       CODEX_PUBLIC_HOST: ${CODEX_PUBLIC_HOST:-codex-mcp}
-      CODEX_PUBLIC_ORIGIN: ${CODEX_PUBLIC_ORIGIN:-http://127.0.0.1:8787}
+      CODEX_PUBLIC_ORIGIN: ${CODEX_PUBLIC_ORIGIN:-http://127.0.0.1:${CODEX_MCP_PORT:-8787}}
       CODEX_API_KEY: ${CODEX_API_KEY:-}
       CODEX_MODEL: ${CODEX_MODEL:-}
       CODEX_MODEL_REASONING_EFFORT: ${CODEX_MODEL_REASONING_EFFORT:-}
+      CODEX_SANDBOX_MODE: ${CODEX_SANDBOX_MODE:-danger-full-access}
     volumes:
       - codex-state:/data
-      - ${CODEX_WORKSPACE_HOST:?Set the host project workspace path}:/workspace
+      - type: bind
+        source: ${CODEX_WORKSPACE_HOST:-./examples/workspace}
+        target: /workspace
+        bind:
+          create_host_path: false
     tmpfs:
       - /tmp:rw,nosuid,nodev,size=256m
     pids_limit: 256

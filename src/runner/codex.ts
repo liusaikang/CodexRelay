@@ -12,8 +12,8 @@ export async function runCodex(execution: Execution, signal: AbortSignal, emit: 
   });
   const options: ThreadOptions = {
     model: execution.model, modelReasoningEffort: execution.modelReasoningEffort, workingDirectory: execution.directory,
-    sandboxMode: 'danger-full-access', approvalPolicy: 'never',
-    networkAccessEnabled: true, webSearchMode: 'live', skipGitRepoCheck: true,
+    sandboxMode: execution.sandboxMode ?? 'danger-full-access', approvalPolicy: 'never',
+    networkAccessEnabled: execution.sandboxMode !== 'read-only', webSearchMode: 'live', skipGitRepoCheck: true,
   };
   const thread = execution.threadId ? codex.resumeThread(execution.threadId, options) : codex.startThread(options);
   const input = execution.context === undefined ? execution.question : [

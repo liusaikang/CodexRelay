@@ -24,7 +24,9 @@
     "test": "npm run build && vitest run",
     "smoke": "node scripts/smoke.mjs",
     "smoke:demo": "node scripts/smoke.mjs --demo",
-    "smoke:browser": "node scripts/browser-smoke.mjs && node scripts/session-smoke.mjs",
+    "smoke:browser": "node scripts/browser-smoke.mjs && node scripts/session-smoke.mjs && node scripts/queue-smoke.mjs",
+    "smoke:container": "node scripts/container-smoke.mjs",
+    "docs:screenshots": "node scripts/queue-smoke.mjs --screenshots",
     "verify": "npm run check && npm test"
   },
   "dependencies": {

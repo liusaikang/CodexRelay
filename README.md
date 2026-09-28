@@ -1,23 +1,29 @@
 # CodexRelay
 
-面向可信业务后端的**原生 Codex SDK 任务网关**。通过 HTTP 或 MCP 提交问题，网关负责认证、排队、并发、会话、取消、超时和结果持久化；Codex 以完整本地执行、网络和实时 Web 搜索能力处理任务，并按原生规则使用项目说明、skills 和 MCP 工具。
+A self-hosted Codex task gateway with MCP tools, HTTP APIs, persistent sessions, bounded concurrency, and an operator console.
 
-网关不维护 capability 路由，不扫描或拼接 skill 内容，也不按问题选择 skill。一个实例使用一个共享 Token，面向同一可信后端域，不提供复杂 RBAC 或多租户隔离。
+将 Codex 接入你的应用：提交问题后立即获得任务 ID，由服务负责排队、执行、会话续接和结果保存。项目说明与 Skills 由 Codex 原生加载，适合代码分析、日志诊断以及可扩展的运维工作流。
 
-当前实现包括原生 SDK 执行、HTTP/MCP/stdio 接入和示例客户端。测试覆盖 SDK 替身、HTTP、MCP、stdio、控制台登录与调度恢复；部署与真实执行的证据及限制见 [验收记录](docs/verification.md)。
+## 能做什么
 
-## 核心约定
+- **接入简单**：`question` 必填，`context`、`sessionId`、`idempotencyKey` 可选。
+- **可控执行**：全局并发、等待容量、排队期限、执行超时，同一会话串行。
+- **保留记录**：任务、会话、运行配置和可选调用日志保存在文件中，无需外部数据库。
+- **便于运维**：账号额度、会话历史、队列、取消、失败重试、调用日志及配置热更新。
+- **两种调用方式**：MCP Streamable HTTP / stdio，或普通 HTTP API。
 
-- 请求只必填 `question`；可选 `context`、`sessionId`、`idempotencyKey`。
-- 工作目录、模型和推理强度由服务配置统一控制，不接受调用方覆盖。`context` 是最大 16 KiB 的 JSON 对象，作为本次任务的参考数据保存并交给 Codex。
-- 默认最多并发 10 个任务、等待 100 个任务，执行超时 600 秒；同会话始终串行。
-- 执行固定 `danger-full-access`、approval `never`、network enabled、实时 Web 搜索开启。API 不能覆盖；调用方通过接入鉴权、部署账户、容器和外部系统凭据控制实际边界。
-- 新任务和会话记录使用 `version: 2`。开发环境固定保存在 `data/native-logs-preview`，生产环境由 `CODEX_DATA_DIR` 指定独立目录；切换环境不会搬迁数据。
-- HTTP、MCP Streamable HTTP 与 stdio 共享任务语义。HTTP/MCP 使用 Bearer Token，stdio 依赖本机进程权限。
+当前面向**单实例、可信调用方**。提交任务时可通过 `sandboxMode` 选择 Codex SDK 原生的 `read-only`、`workspace-write`、`danger-full-access`；省略采用服务默认值，兼容默认值为完整权限。Skills 是行为说明，不是权限隔离。详见 [权限参数](docs/http-api.md#sandboxmode) 与 [安全边界](SECURITY.md)。
 
-## 启动
+## 控制台预览
 
-需要 Node.js 22.12+。在仓库根目录执行，Windows PowerShell 可使用 `npm.cmd`：
+下图来自真实控制台界面与合成测试数据，不包含真实账号、认证文件或业务记录。
+
+![任务队列](docs/images/console-queue.png)
+![会话排查](docs/images/console-conversation.png)
+
+## 本地运行
+
+需要 Node.js 22.12+、Git，以及可用的 Codex 账号或 API 认证。
 
 ```sh
 npm ci
@@ -27,71 +33,84 @@ npm run check:dev
 npm run start:dev
 ```
 
-`npm start` 和旧命令 `npm run start:env` 均等同于 `npm run start:dev`。生产环境先在 `.env` 中设置独立的 `CODEX_DATA_DIR`、`CODEX_INVOCATION_LOG_DIR`、`CODEX_HOME`、`CODEX_WORKSPACE`、`CODEX_CONSOLE_USERNAME`、`CODEX_CONSOLE_PASSWORD`、`CODEX_PUBLIC_HOST` 和 `CODEX_PUBLIC_ORIGIN`，然后运行 `npm run check:prod` 与 `npm run start:prod`；Docker 使用同一份生产配置。不要同时启动共用同一目录的实例。详见 [部署说明](docs/deployment.md)。`init:env` 生成服务访问令牌；模型认证另用 `CODEX_API_KEY` 或专用 Codex home 登录。API Key、代理和远端工具凭据只由部署环境注入，不写入仓库。
+打开 <http://127.0.0.1:8787/>，开发控制台使用 `admin/admin`。模型认证与控制台登录相互独立，需按 [部署文档](docs/deployment.md) 登录专用 Codex home。`init:env` 创建随机服务 Token 和生产控制台密码，已有 `.env` 不会被覆盖。
 
-`runner: codex` 使用真实模型并消耗额度；`runner: demo` 仅用于离线链路演示，不验证真实模型、原生 skill 发现或沙箱权限。可使用 `config/demo.yaml` 启动 demo。安装依赖不要省略 SDK 所需的平台可选依赖。
+开发与生产分别使用 `config/development.yaml` 和 `config/production.yaml`，启动命令为 `npm run start:dev` / `npm run start:prod`。开发数据目录保持固定；生产目录由环境变量指定。配置热更新不改变数据目录。
 
-开发环境默认地址：控制台 `http://127.0.0.1:8787/`，HTTP API `http://127.0.0.1:8787/v1/`，MCP `http://127.0.0.1:8787/mcp`，健康检查 `http://127.0.0.1:8787/healthz`。控制台首次访问跳转登录页；开发环境示例账号为 `admin/admin`，由 `config/development.yaml` 的 `server.consoleAuth` 配置，不能对外使用。生产环境账号密码必须从环境变量提供。登录后可查看额度、提交任务、分析调用日志并调整可热更新的运行参数；覆盖值持久化在 `dataDir/runtime-settings.json`。端口、目录和凭证仍只通过部署配置调整，详见 [控制台运行配置](docs/configuration.md#控制台运行配置)。浏览器使用独立会话 Cookie，不接收服务 Bearer Token。平台后端及 MCP 仍使用 Bearer Token。
+## Docker Compose
 
-两套固定配置均启用调用日志，按日期和任务保存 JSON，保留 30 天。关闭日志不影响核心任务持久化。配置、统计口径及数据保留规则见 [调用日志配置](docs/configuration.md#调用日志)。
+安装 Docker Engine / Docker Desktop（Linux 容器）与 Compose v2。生成 `.env` 后可先使用内置样例工作目录：
 
-## 提交与追问
-
-最小请求，发送到 `POST /v1/tasks`，请求头使用 `Authorization: Bearer <服务令牌>`：
-
-```json
-{
-  "question": "请分析样例日志中的订单查询失败，给出证据和不确定性。"
-}
+```sh
+docker compose build
+docker compose run --rm codex-mcp codex login --device-auth
+docker compose run --rm codex-mcp codex login status
+docker compose up -d
 ```
 
-可信后端可以附加结构化业务上下文：
+地址仍为 <http://127.0.0.1:8787/>；控制台密码取自 `.env` 的 `CODEX_CONSOLE_PASSWORD`。容器认证、线程和任务持久化在 `codex-state` 卷中。配置 `CODEX_WORKSPACE_HOST` 可挂载自己的项目与 Skills。远程访问、升级、容器检查和异常恢复见 [部署文档](docs/deployment.md)。
+
+## HTTP 调用
+
+平台后端将环境变量中的服务 Token 放到 `Authorization: Bearer ...` 请求头，向 `POST /v1/tasks` 提交：
 
 ```json
 {
-  "question": "为什么这个账号看不到订单？",
+  "question": "为什么这个示例账号看不到订单？",
   "context": {
-    "subject": {
-      "account": "demo-user",
-      "tenantId": "tenant-demo-001"
-    }
+    "subject": { "account": "demo-user", "tenantId": "tenant-demo-001" }
   },
   "idempotencyKey": "feedback-demo-001"
 }
 ```
 
-返回 `taskId` 用来查询结果，`sessionId` 用来追问。追问提交新问题及已有 `sessionId`；新问题使用新幂等键，重试同一次提交复用原键及参数。不要向普通用户浏览器暴露共享服务 Token。
+返回 `taskId`、`sessionId`、`status`，每隔 2–5 秒查询 `GET /v1/tasks/{taskId}`。追问携带 `sessionId`；同一次网络请求重发复用原幂等键，新问题使用新键。完整示例见 [HTTP API](docs/http-api.md)。
 
-服务信息入口为 `GET /v1/info` 和 `codex_get_service_info`，不是项目或 skill 清单。MCP 保持六个工具，完整字段见 [接口文档](docs/api.md)。
+## MCP 调用
 
-调度采用有界接收、持久化队列、全局并发和同会话串行。支持排队过期、前序失败后的确认继续及异常锁检查，详见 [任务调度与恢复](docs/scheduling.md)。当前为单实例产品，不支持共享数据目录的多副本部署。
+远程地址为 `http://127.0.0.1:8787/mcp`，客户端设置 Bearer Token。先调用 `codex_submit_task`，再使用 `codex_get_task` 查询结果。
 
-## 原生项目说明与 Skills
+| 工具 | 用途 |
+| --- | --- |
+| `codex_get_service_info` | 执行器、模型和调度参数 |
+| `codex_submit_task` | 提交问题或追问 |
+| `codex_get_task` | 查询状态、进度及结果 |
+| `codex_cancel_task` | 取消排队中或运行中的任务 |
+| `codex_list_sessions` | 分页查看会话 |
+| `codex_get_session` | 查看会话和任务摘要 |
 
-示例工作目录约定：
+[MCP 接入指南](docs/mcp.md) 提供客户端代码、stdio 设置和错误处理。
+
+## 扩展到自己的项目
+
+在服务工作目录中放置 `AGENTS.md` 和 `.agents/skills/<name>/SKILL.md`，按 Codex 原生方式配置上游 MCP 工具。调用方不需要传工作目录或模型参数。
 
 ```text
-examples/workspace/
+your-workspace/
   AGENTS.md
-  .agents/skills/
-    log-evidence/
-      SKILL.md
+  .agents/skills/log-evidence/SKILL.md
+  src/
 ```
 
-项目说明放在配置项 `codex.defaultWorkingDirectory` 对应目录的 `AGENTS.md`，原生 skill 放在其 `.agents/skills/<名称>/SKILL.md`，无需网关注册。仓库示例分别位于 `examples/workspace/AGENTS.md` 和 `examples/workspace/.agents/skills/log-evidence/SKILL.md`。
+部署设置、模型与推理强度见 [配置说明](docs/configuration.md)。示例目录 `examples/workspace` 只包含合成证据。
 
-目录名是 `.agents`，不是 `.agent`。仓库级发现以任务工作目录及其到仓库根目录的祖先路径为范围，不会因为某个目录位于 service 源码树里就任意遍历它。详见 [官方 Build skills](https://learn.chatgpt.com/docs/build-skills)。
+## 开发与验证
 
-上游 MCP 由管理员在专用 `codex.home/config.toml` 中按 Codex 原生方式配置。服务 YAML 不承载上游 MCP 定义；上游工具和凭据具有什么权限，由调用方及部署管理员决定，网关不再裁剪。
+```sh
+npm run verify
+npm run release:check
+npx playwright install chromium
+npm run smoke:browser
+```
 
-## 部署与迁移
+CI 配置涵盖 Windows、macOS、Linux，以及容器构建检查和 Git 历史秘密扫描。测试使用受控执行器，不消耗真实模型额度。实际验证范围记录在 [验证说明](docs/verification.md)。
 
-新配置只围绕 `dataDir`、`server`、`tasks`、`runner`、`codex` 组织，不再使用 `projects`、`capabilities`、`promptFile`、`skillFiles` 或 `mcpServers`。完整样例见 [配置文档](docs/configuration.md)。
+## 文档与边界
 
-默认新目录不会自动汇总旧数据目录。需要查询旧 v1 数据时，按 [运维与迁移](docs/operations.md) 保留并接入旧存储；不得将旧 queued 当作新任务恢复执行。
+- [部署与登录](docs/deployment.md) · [MCP](docs/mcp.md) · [HTTP API](docs/http-api.md)
+- [架构图](docs/architecture.md) · [调度与恢复](docs/scheduling.md) · [配置](docs/configuration.md)
+- [贡献指南](CONTRIBUTING.md) · [安全说明](SECURITY.md)
 
-示例客户端使用 `--context` 传入可选 JSON 对象，保留 `--inline-example` 用于合成证据直传；完整调用方式见 [部署与接入](docs/deployment.md)。
+一个数据目录只能由一个服务实例占用。取消不会撤销已发生的外部操作；重试创建新会话并保留原失败记录。调用日志保留期不负责删除任务历史与 Codex 原生线程。
 
-Docker 文件与配置已迁移，但尚未实跑；镜像、挂载、网络和目标宿主能力需单独验收。发布前还应执行 `npm run release:check` 并审查实际输出，不能以测试通过代替部署验收。
-
-进一步阅读：[架构](docs/design.md)、[实施与验收计划](docs/implementation-plan.md)、[安全边界](SECURITY.md)、[贡献指南](CONTRIBUTING.md)。原生线程执行依据 [官方 Codex SDK](https://learn.chatgpt.com/docs/codex-sdk)。
+源码发布前仍需由维护者选择并添加项目许可证；当前 `private: true` 仅防止误发 npm，不代表已经授予开源许可。

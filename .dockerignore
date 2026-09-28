@@ -7,7 +7,9 @@
 !public/
 !public/**
 !config/
-!config/docker.yaml
+!config/production.yaml
+!scripts/
+!scripts/container-smoke.mjs
 !examples/
 !examples/workspace/
 !examples/workspace/**

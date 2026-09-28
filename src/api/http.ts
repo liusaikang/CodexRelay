@@ -5,7 +5,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { z, ZodError } from 'zod';
 import { createMcpServer } from './mcp.js';
 import { TaskService } from '../service.js';
-import { AppError, idSchema, pageSchema } from '../types.js';
+import { AppError, idSchema, pageSchema, retrySchema } from '../types.js';
 import type { AccountStatusProvider } from '../account.js';
 import { invocationQuerySchema } from '../invocations.js';
 
@@ -80,6 +80,10 @@ export function createHttpApp(service: TaskService, token: string, accountStatus
       if (!consoleSession(req)) { res.status(401).end(); return; }
       res.sendFile(fileURLToPath(new URL('../../public/settings.js', import.meta.url))); return;
     }
+    if (req.method === 'GET' && req.path === '/assets/queue.js') {
+      if (!consoleSession(req)) { res.status(401).end(); return; }
+      res.sendFile(fileURLToPath(new URL('../../public/queue.js', import.meta.url))); return;
+    }
     if (req.method === 'GET' && req.path === '/favicon.ico') { res.status(204).end(); return; }
     if (req.path === '/healthz' && req.method === 'GET') {
       const ready = service.health().ready;
@@ -146,6 +150,11 @@ export function createHttpApp(service: TaskService, token: string, accountStatus
     ? await accountStatus.read(true)
     : { available: false, authenticated: false, checkedAt: new Date().toISOString() }));
   app.post('/v1/tasks', async (req, res) => res.status(202).json(await service.submit(req.body)));
+  app.get('/v1/tasks', (req, res) => res.json(service.listTasks(req.query)));
+  app.post('/v1/tasks/:id/retry', async (req, res) => {
+    const { idempotencyKey } = retrySchema.parse(req.body);
+    res.status(202).json(await service.retry(idSchema.parse(req.params.id), idempotencyKey));
+  });
   app.get('/v1/tasks/:id', (req, res) => res.json(service.getTask(idSchema.parse(req.params.id))));
   app.post('/v1/tasks/:id/cancel', async (req, res) => res.json(await service.cancel(idSchema.parse(req.params.id))));
   app.post('/v1/sessions/:id/resume', async (req, res) => {

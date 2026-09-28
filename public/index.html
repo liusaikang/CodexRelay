@@ -33,6 +33,7 @@
     footer{padding:15px 32px;border-top:1px solid var(--line);background:white;display:flex;justify-content:space-between;gap:12px;color:var(--muted);font-size:11px}
     @media(max-width:900px){header,.quick-nav{padding-left:20px;padding-right:20px}.task-shell{grid-template-columns:320px minmax(0,1fr)}.compose,.history{padding:22px 18px}.workspace{padding:24px 20px}}
     @media(max-width:680px){header{height:66px;padding:0 16px}.subtitle{display:none}h1{font-size:18px}.quick-nav{height:48px;padding:0 12px;gap:8px}.quick-nav button{font-size:12px;gap:4px}.quick-nav button svg{width:14px;height:14px}.view{min-height:calc(100vh - 151px)}.account-shell{margin:28px auto;width:min(100% - 24px,760px)}.page-heading{flex-direction:column;align-items:stretch}.page-heading button{align-self:flex-start}.account-panel{padding:20px}.facts{grid-template-columns:1fr}.fact+.fact{border-left:0;border-top:1px solid var(--line)}.quota-details{flex-direction:column;gap:2px}.connection-strip{grid-template-columns:1fr;padding:16px}.task-shell{display:flex;flex-direction:column}.task-sidebar{border-right:0}.workspace{border-top:1px solid var(--line);padding:22px 16px}.compose,.history{padding:22px 16px}.stats{gap:10px}.detail-tabs{gap:17px}.message{margin:12px 16px 0}footer{padding:14px 16px;flex-direction:column}}
+    .queue-shell{max-width:1560px;margin:auto;padding:24px;background:white;min-height:70vh}.queue-toolbar{display:flex;flex-wrap:wrap;align-items:end;gap:16px;margin:22px 0}.queue-toolbar .field{margin:0;flex:1 1 200px}.queue-toolbar select{width:100%;height:40px;font:inherit;border:1px solid var(--line);border-radius:6px;background:white;padding:6px}.queue-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px;border-block:1px solid var(--line);padding:18px 0}.queue-metrics strong{display:block;font-size:22px}.queue-table-wrap{overflow:auto}.queue-table{width:100%;border-collapse:collapse;font-size:12px;text-align:left;min-width:800px}.queue-table th,.queue-table td{padding:12px 10px;border-bottom:1px solid var(--line);vertical-align:top}.queue-table th{color:var(--muted);font-weight:600;background:var(--surface)}.queue-question{max-width:340px;overflow-wrap:anywhere;white-space:pre-wrap}.queue-id{font-size:10px;overflow-wrap:anywhere;max-width:310px;color:var(--muted)}.queue-actions{display:flex;gap:6px}.queue-pagination{display:flex;justify-content:space-between;align-items:center;margin-top:16px}.queue-note{font-size:12px;color:var(--muted)}.queue-shell .message{margin:12px 0}.turn-actions{display:flex;gap:8px;margin-top:12px}@media(max-width:680px){.queue-shell{padding:16px}.queue-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.queue-toolbar{gap:10px}}
   </style>
   <script src="/assets/lucide.js"></script>
 </head>
@@ -44,6 +45,7 @@
   <nav class="quick-nav" aria-label="快捷栏">
     <button type="button" data-view="account-view" aria-current="page"><i data-lucide="gauge"></i>账号额度</button>
     <button type="button" data-view="task-view" aria-current="false"><i data-lucide="messages-square"></i>Codex 调用</button>
+    <button type="button" data-view="queue-view" aria-current="false"><i data-lucide="list-ordered"></i>任务队列</button>
     <button type="button" data-view="logs-view" aria-current="false"><i data-lucide="list-filter"></i>调用日志</button>
     <button type="button" data-view="settings-view" aria-current="false"><i data-lucide="sliders-horizontal"></i>运行配置</button>
   </nav>
@@ -135,6 +137,27 @@
       </form>
     </main>
   </section>
+  <section id="queue-view" class="view hidden">
+    <main class="queue-shell">
+      <div class="page-heading"><h2>任务队列</h2><button id="queue-refresh" title="刷新任务队列"><i data-lucide="refresh-cw"></i>刷新</button></div>
+      <div class="queue-metrics" aria-label="队列容量">
+        <div><span class="muted">运行中 / 并发上限</span><strong id="queue-running">—</strong><progress id="queue-running-bar" value="0" max="1" aria-label="并发使用量"></progress></div>
+        <div><span class="muted">排队中 / 等待容量</span><strong id="queue-waiting">—</strong><progress id="queue-waiting-bar" value="0" max="1" aria-label="队列使用量"></progress></div>
+        <div><span class="muted">前序失败待确认</span><strong id="queue-blocked">—</strong></div>
+        <div><span class="muted">接收中</span><strong id="queue-receiving">—</strong></div>
+      </div>
+      <form id="queue-filter" class="queue-toolbar">
+        <div class="field"><label for="queue-status">任务状态</label><select id="queue-status"><option value="active">运行中与排队中</option><option value="all">全部任务</option><option value="running">运行中</option><option value="queued">排队中</option><option value="failed">失败</option><option value="timed_out">超时</option><option value="interrupted">中断</option><option value="cancelled">取消</option><option value="succeeded">成功</option></select></div>
+        <div class="field"><label for="queue-keyword">问题 / 任务 ID / 会话 ID</label><input id="queue-keyword" maxlength="200" type="search"></div>
+        <button type="submit" title="筛选任务"><i data-lucide="search"></i>查询</button>
+        <label class="row"><input id="queue-auto" type="checkbox" checked style="width:16px;height:16px">自动刷新队列</label>
+      </form>
+      <div id="queue-message" class="message hidden" role="status"></div>
+      <div class="queue-table-wrap"><table class="queue-table"><thead><tr><th>任务与问题</th><th>状态</th><th>等待原因 / 入队序号</th><th>接收 / 等待 / 执行</th><th>操作</th></tr></thead><tbody id="queue-rows"></tbody></table></div>
+      <div class="queue-pagination"><span id="queue-total" class="muted">尚未读取</span><div class="row"><button id="queue-prev" class="icon" title="上一页" aria-label="队列上一页"><i data-lucide="chevron-left"></i></button><button id="queue-next" class="icon" title="下一页" aria-label="队列下一页"><i data-lucide="chevron-right"></i></button></div></div>
+      <p id="queue-updated" class="queue-note">尚未同步</p>
+    </main>
+  </section>
   <footer><span>CodexRelay / Codex SDK</span><span id="last-updated">尚未同步</span></footer>
 
   <script type="module">
@@ -164,6 +187,42 @@
       }
     }
     let settingsPanelPromise;
+    let queuePanelPromise;
+    async function loadQueuePanel() {
+      try {
+        queuePanelPromise ??= import('/assets/queue.js').then(({createQueuePanel}) => createQueuePanel({api,formatTime,labels,waitingLabels,
+          onInspect: async item => { showView('task-view'); await selectSession(item.sessionId,item.taskId); },
+          onAction: performTaskAction}));
+        const panel = await queuePanelPromise;
+        if (!$('queue-view').classList.contains('hidden')) panel.show();
+      } catch { queuePanelPromise = undefined; message('queue-message','任务队列加载失败，请刷新重试。'); }
+    }
+    const taskActions = new Set();
+    async function performTaskAction(item, action) {
+      const key = `${action}:${item.taskId}`;
+      if (taskActions.has(key)) return;
+      const prompts = {cancel:'确认取消这个任务？已经完成的文件或外部系统操作不会撤销。',
+        retry:'确认在新会话中使用原问题和上下文重试？旧记录保留，执行可能重复外部操作。',
+        resume:'前序任务未成功，确认继续原会话的后续任务？'};
+      if (!confirm(prompts[action])) return;
+      taskActions.add(key);
+      try {
+        let result;
+        if (action === 'retry') {
+          const storageKey = `codexrelay.pending-retry:${item.taskId}`;
+          let retryKey;
+          try {
+            retryKey = sessionStorage.getItem(storageKey) || crypto.randomUUID();
+            sessionStorage.setItem(storageKey,retryKey);
+          } catch { throw new Error('无法保存重试幂等键，请允许当前页面使用会话存储后重试。'); }
+          result = await api(`/v1/tasks/${item.taskId}/retry`,{method:'POST',body:JSON.stringify({idempotencyKey:retryKey})});
+          try { sessionStorage.removeItem(storageKey); } catch { /* Keeping the key only deduplicates the next attempt. */ }
+        } else if (action === 'resume') {
+          result = await api(`/v1/sessions/${item.sessionId}/resume`,{method:'POST',body:JSON.stringify({blockedByTaskId:item.scheduling.blockedByTaskId})});
+        } else result = await api(`/v1/tasks/${item.taskId}/cancel`,{method:'POST'});
+        return result;
+      } finally { taskActions.delete(key); }
+    }
     async function loadSettingsPanel() {
       try {
         settingsPanelPromise ??= import('/assets/settings.js').then(({createSettingsPanel}) => createSettingsPanel({api,formatTime,refreshHealth}));
@@ -294,6 +353,31 @@
             }
           }
           if (item.error) body.append(element('p','turn-note error',`${item.error.code}: ${item.error.message}`));
+          if ((!terminal(item) && !item.stopReason) || (item.version !== 1 && ['failed','timed_out','interrupted','cancelled'].includes(item.status))) {
+            const action = terminal(item) ? 'retry' : 'cancel';
+            const controls = element('div','turn-actions'), button = element('button','',action === 'retry' ? '新会话重试' : '取消任务');
+            button.type = 'button'; button.disabled = taskActions.has(`${action}:${item.taskId}`);
+            button.onclick = async () => {
+              button.disabled = true;
+              const epoch = viewEpoch, draft = ['question','context','session'].map(id => $(id).value);
+              let result;
+              try {
+                result = await performTaskAction(item,action);
+                if (result && action === 'retry') {
+                  const unchanged = epoch === viewEpoch && !$('task-view').classList.contains('hidden') && ['question','context','session'].every((id,i) => $(id).value === draft[i]);
+                  if (unchanged) await selectSession(result.sessionId,result.taskId,result);
+                  else message('task-message',`重试已接收：${result.taskId}。当前会话与草稿保持不变。`);
+                  await refreshSessions();
+                } else if (epoch === viewEpoch) await refreshConversation({force:true});
+                await refreshHealth();
+              } catch (error) {
+                message('task-message',result && action === 'retry' ? `重试已接收：${result.taskId}，页面同步失败，请按任务 ID 查询。${error.message}` : '操作未确认完成，请刷新核对；重试按钮会复用本次幂等键。' + error.message);
+              }
+              finally { button.disabled = false; }
+            };
+            controls.append(button); body.append(controls);
+          }
+          if (item.retryOfTaskId) body.append(element('p','turn-note',`重试来源：${item.retryOfTaskId}`));
           const answer = item.result?.markdown;
           body.append(element('h4','','Codex 返回结果'));
           if (typeof answer === 'string' && answer.trim()) body.append(element('pre','turn-answer',answer));
@@ -438,12 +522,14 @@
       } finally { $('reconnect').disabled = false; syncTaskControls(); }
     }
     function showView(id) {
-      for (const name of ['account-view','task-view','logs-view','settings-view']) $(name).classList.toggle('hidden',name !== id);
+      for (const name of ['account-view','task-view','logs-view','settings-view','queue-view']) $(name).classList.toggle('hidden',name !== id);
       for (const button of document.querySelectorAll('.quick-nav button')) button.setAttribute('aria-current',button.dataset.view === id ? 'page' : 'false');
       if (id === 'task-view') { void ensureTaskConsole(); startMonitor(); }
       else clearTimeout(monitorTimer);
       if (id === 'logs-view') void loadInvocationPanel();
       if (id === 'settings-view') void loadSettingsPanel();
+      if (id === 'queue-view') void loadQueuePanel();
+      else if (queuePanelPromise) void queuePanelPromise.then(panel => panel.hide()).catch(() => {});
     }
     $('task-form').onsubmit = async event => {
       event.preventDefault(); if (!taskReady || submitting) return;

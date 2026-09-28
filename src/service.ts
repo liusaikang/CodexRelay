@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { resolveWorkingDirectory } from './config.js';
 import { InvocationLog, type InvocationTransport } from './invocations.js';
 import { RuntimeSettingsStore } from './settings.js';
-import { AppError, isTerminal, submitSchema, type Execution, type Runner, type RuntimeConfig, type Session, type Store, type SubmitInput, type Task } from './types.js';
+import { AppError, isTerminal, submitSchema, taskListSchema, retrySchema, type Execution, type Runner, type RuntimeConfig, type Session, type Store, type SubmitInput, type Task } from './types.js';
 
 const now = () => new Date().toISOString();
 const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -73,12 +73,15 @@ export class TaskService {
     if (current !== task) return { reason: 'session_predecessor', blockedByTaskId: task.dependsOnTaskId };
     return undefined;
   }
-  private viewTask(task: Task) {
-    const scheduling = task.status === 'queued' ? {
+  private schedulingFor(task: Task) {
+    return task.status === 'queued' ? {
       ...(this.closing ? { reason: 'service_stopping' } : this.fault ? { reason: 'storage_unavailable' } : this.blocker(task)
         ?? { reason: this.active.size >= this.config.maxConcurrent ? 'capacity' : 'ready' }),
       queueExpiresAt: task.queueExpiresAt,
     } : undefined;
+  }
+  private viewTask(task: Task) {
+    const scheduling = this.schedulingFor(task);
     return { ...publicTask(task), ...(scheduling ? { scheduling } : {}) };
   }
   private armQueueTimer() {
@@ -162,12 +165,13 @@ export class TaskService {
       model: session ? session.model : this.config.defaultModel,
       modelReasoningEffort: session ? session.modelReasoningEffort : this.config.defaultReasoningEffort,
     };
+    // Keep the original session identity; sandbox selection is persisted per task.
     return { ...runtime, configHash: hash({ policy: 'native-full-access-v1', ...runtime, codexHome: this.config.codexHome, runner: this.config.runner, envAllowlist: this.config.envAllowlist, codexPath: this.config.codexPath }) };
   }
-  async submit(raw: SubmitInput, transport: InvocationTransport = 'http') {
+  async submit(raw: SubmitInput, transport: InvocationTransport = 'http', retryOfTaskId?: string) {
     const request = submitSchema.parse(raw);
     this.available();
-    const requestHash = hash(request), key = request.idempotencyKey;
+    const requestHash = hash(retryOfTaskId ? { request, retryOfTaskId } : request), key = request.idempotencyKey;
     if (key) {
       const inFlight = this.admissions.get(key);
       if (inFlight) {
@@ -204,8 +208,10 @@ export class TaskService {
       if (!canStart && this.pending.size >= this.config.maxQueued) throw new AppError('QUEUE_FULL', 'Task queue is full. Retry later with the same idempotencyKey.', 429);
       if (this.sequence >= Number.MAX_SAFE_INTEGER) throw new AppError('SEQUENCE_EXHAUSTED', 'Task sequence exhausted.', 503);
       const task: Task = { version: 2, taskId: `task_${randomUUID()}`, sessionId: session.sessionId, request, requestHash, configHash, status: 'queued', createdAt: now(), progress: [],
+        sandboxMode: request.sandboxMode ?? this.config.sandboxMode ?? 'danger-full-access',
         enqueueSequence: ++this.sequence, queueExpiresAt: new Date(Date.now() + (this.config.queueTimeoutSeconds ?? 1800) * 1000).toISOString(),
-        dependsOnTaskId: previous && !isTerminal(previous) ? previous.taskId : undefined };
+        dependsOnTaskId: previous && !isTerminal(previous) ? previous.taskId : undefined,
+        ...(retryOfTaskId ? { retryOfTaskId } : {}) };
       if (this.invocations.enabled) task.invocationTransport = transport;
       if (!request.sessionId) {
         await this.persist(() => this.store.saveSession(session));
@@ -268,7 +274,7 @@ export class TaskService {
     env.CODEX_HOME = this.config.codexHome;
     return { taskId: task.taskId, question: task.request.question, context: task.request.context, directory: session.workingDirectory!,
       codexHome: this.config.codexHome, model: session.model, modelReasoningEffort: session.modelReasoningEffort, threadId: session.threadId,
-      env, codexPath: this.config.codexPath };
+      env, codexPath: this.config.codexPath, sandboxMode: task.sandboxMode ?? task.request.sandboxMode ?? 'danger-full-access' };
   }
   private async execute(task: Task, controller: AbortController) {
     const timer = setTimeout(() => {
@@ -358,6 +364,37 @@ export class TaskService {
     if (this.fault) throw new AppError('STORAGE_UNAVAILABLE', 'Task state is unavailable after a storage failure.', 503);
   }
   getTask(id: string) { this.readable(); return this.viewTask(this.findTask(id)); }
+  listTasks(input: unknown) {
+    this.readable();
+    const { offset, limit, status, keyword } = taskListSchema.parse(input);
+    const search = keyword.toLowerCase();
+    const positions = new Map([...this.pending.keys()].map((id, index) => [id, index + 1]));
+    const rows = [...this.tasks.values()].filter(task =>
+      (status === 'all' || (status === 'active' ? !isTerminal(task) : task.status === status))
+      && (!search || [task.taskId, task.sessionId, task.request.question].some(value => value.toLowerCase().includes(search))))
+      .sort((a, b) => status === 'active' || status === 'queued'
+        ? a.enqueueSequence! - b.enqueueSequence! : b.enqueueSequence! - a.enqueueSequence!);
+    const result = page(rows, offset, limit);
+    return { ...result, items: result.items.map(task => ({
+      version: task.version, taskId: task.taskId, sessionId: task.sessionId, status: task.status,
+      questionPreview: task.request.question.slice(0, 160),
+      createdAt: task.createdAt, startedAt: task.startedAt, finishedAt: task.finishedAt,
+      queuePosition: positions.get(task.taskId), scheduling: this.schedulingFor(task),
+      stopReason: task.stopReason, retryOfTaskId: task.retryOfTaskId,
+    })) };
+  }
+  async retry(taskId: string, key: string) {
+    const { idempotencyKey } = retrySchema.parse({ idempotencyKey: key });
+    this.available();
+    const original = this.findTask(taskId);
+    if (original.version !== 2 || !isTerminal(original) || original.status === 'succeeded') {
+      throw new AppError('TASK_NOT_RETRYABLE', 'Only failed, cancelled, timed-out or interrupted native tasks can be retried.', 409);
+    }
+    // A fresh thread avoids replaying a partially completed turn in existing history.
+    return this.submit({ question: original.request.question, context: original.request.context,
+      sandboxMode: original.sandboxMode ?? original.request.sandboxMode ?? 'danger-full-access',
+      idempotencyKey: `retry_${hash([taskId, idempotencyKey])}` }, 'http', taskId);
+  }
   listSessions(offset: number, limit: number) {
     this.readable();
     return page([...this.sessions.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(publicSession), offset, limit);
@@ -371,10 +408,11 @@ export class TaskService {
     return { ...publicSession(session), tasks: { ...result, items: result.items.map(t => ({ taskId: t.taskId, status: t.status, question: t.request.question, createdAt: t.createdAt })) } };
   }
   info() {
+    const sandboxMode = this.config.sandboxMode ?? 'danger-full-access';
     return { defaultWorkingDirectory: this.config.defaultWorkingDirectory, defaultModel: this.config.defaultModel,
       defaultReasoningEffort: this.config.defaultReasoningEffort, maxConcurrent: this.config.maxConcurrent, maxQueued: this.config.maxQueued,
       queueTimeoutSeconds: this.config.queueTimeoutSeconds ?? 1800, timeoutSeconds: this.config.timeoutSeconds, admissionLimit: this.admissionLimit,
-      accessMode: 'danger-full-access', readOnly: false, networkAccess: true, webSearch: 'live', runner: this.config.runner };
+      accessMode: sandboxMode, readOnly: sandboxMode === 'read-only', networkAccess: sandboxMode !== 'read-only', webSearch: 'live', runner: this.config.runner };
   }
   getSettings() { this.readable(); return { ...this.settings.snapshot(), logging: this.invocations.status() }; }
   async updateSettings(input: unknown, actor: string) {

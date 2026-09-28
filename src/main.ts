@@ -32,7 +32,7 @@ async function main() {
   if (values.check) {
     console.log(JSON.stringify({ valid: true, configFile: resolve(values.config!), dataDir: config.dataDir,
       invocationLog: config.invocationLog?.enabled === true, runner: config.runner, maxConcurrent: config.maxConcurrent, maxQueued: config.maxQueued,
-      queueTimeoutSeconds: config.queueTimeoutSeconds, timeoutSeconds: config.timeoutSeconds,
+      queueTimeoutSeconds: config.queueTimeoutSeconds, timeoutSeconds: config.timeoutSeconds, sandboxMode: config.sandboxMode,
       defaultWorkingDirectory: config.defaultWorkingDirectory, localConsole: !!config.localConsole,
       modelAuthentication: process.env.CODEX_API_KEY && config.envAllowlist.includes('CODEX_API_KEY') ? 'api-key-present-not-validated' : existsSync(join(config.codexHome, 'auth.json')) ? 'auth-file-present-not-validated' : 'not-detected',
       outboundProxyConfigured: !!(process.env.HTTPS_PROXY || process.env.HTTP_PROXY) }, null, 2));

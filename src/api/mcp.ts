@@ -18,8 +18,8 @@ export function createMcpServer(service: TaskService, transport: 'mcp' | 'stdio'
   const read = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false };
   server.registerTool('codex_submit_task', {
     title: '提交 Codex 分析任务',
-    description: 'Submit a question and optional structured context to the native Codex Harness with full local execution, network and live web-search access, then immediately return taskId/sessionId/status. Poll codex_get_task. The service uses its configured working directory, model and reasoning effort. Omit sessionId for a new task; pass it to continue the same Codex thread. Reuse idempotencyKey only when retrying the identical question and context.',
-    inputSchema: submitSchema.shape, outputSchema,
+    description: 'Submit a question and optional structured context to the native Codex Harness, then immediately return taskId/sessionId/status. Optional sandboxMode uses native Codex values: read-only, workspace-write, danger-full-access; omission uses the service default for this task. Poll codex_get_task. The service uses its configured working directory, model and reasoning effort. Omit sessionId for a new task; pass it to continue the same Codex thread. Reuse idempotencyKey only when retrying identical parameters, including sandboxMode.',
+    inputSchema: submitSchema, outputSchema,
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
   }, input => respond(() => service.submit(input, transport)));
   server.registerTool('codex_get_task', {
@@ -39,7 +39,7 @@ export function createMcpServer(service: TaskService, transport: 'mcp' | 'stdio'
     inputSchema: { sessionId: idSchema, ...pageSchema.shape }, outputSchema, annotations: read,
   }, ({ sessionId, offset, limit }) => respond(() => service.getSession(sessionId, offset, limit)));
   server.registerTool('codex_get_service_info', {
-    title: '查看任务服务配置', description: 'Get the fixed full-access execution policy, default working directory, model settings and queue limits. Skills are managed by the native Codex Harness, not a service capability registry.',
+    title: '查看任务服务配置', description: 'Get the default sandbox policy, default working directory, model settings and queue limits. Individual tasks may specify sandboxMode. Skills are managed by the native Codex Harness, not a service capability registry.',
     inputSchema: {}, outputSchema, annotations: read,
   }, () => respond(() => service.info()));
   return server;

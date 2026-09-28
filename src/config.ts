@@ -2,7 +2,7 @@ import { readFile, realpath, stat } from 'node:fs/promises';
 import { dirname, isAbsolute, resolve, relative, sep } from 'node:path';
 import { z } from 'zod';
 import { parse } from 'yaml';
-import { AppError, modelReasoningEffortSchema, type RuntimeConfig } from './types.js';
+import { AppError, modelReasoningEffortSchema, sandboxModeSchema, type RuntimeConfig } from './types.js';
 import { canonicalStoragePath } from './paths.js';
 
 const expandEnv = (value: string) => value.replace(/\$\{([A-Z0-9_]+)(?::-([^}]*))?\}/gi, (_match, key: string, fallback?: string) => {
@@ -26,6 +26,7 @@ const tasksSchema = z.object({
   queueTimeoutSeconds: z.number().int().min(1).max(604800).default(1800),
 }).strict();
 const codexSchema = z.object({
+  sandboxMode: z.string().default('danger-full-access'),
   home: z.string().default('../data/codex-home'),
   defaultWorkingDirectory: z.string().default('../examples/workspace'),
   defaultModel: z.string().optional(), defaultReasoningEffort: z.string().optional(),
@@ -81,6 +82,7 @@ export async function loadConfig(file: string): Promise<RuntimeConfig> {
     }
   }
   return {
+    sandboxMode: sandboxModeSchema.parse(expandEnv(config.codex.sandboxMode)),
     invocationLog: { ...config.invocationLog, directory: logDirectory },
     ...config.server, host, allowedHosts, allowedOrigins, consoleAuth: config.server.consoleAuth && {
       username: expandEnv(config.server.consoleAuth.username),

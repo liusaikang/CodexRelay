@@ -40,7 +40,7 @@ flowchart TD
 
 ## 会话契约
 
-提交契约严格限定为必填 `question`，以及可选 `context`、`sessionId`、`idempotencyKey`。`context` 必须是 JSON 对象，最多 16 KiB，由可信业务后端生成并作为不可信参考数据交给 Codex，不能作为指令或权限来源。工作目录、模型和推理强度不属于请求参数；新会话读取服务默认值并保存，默认配置变化不能悄悄改变既有会话。
+提交契约严格限定为必填 `question`，以及可选 `context`、`sessionId`、`idempotencyKey`、`sandboxMode`。`context` 必须是 JSON 对象，最多 16 KiB，由可信业务后端生成并作为不可信参考数据交给 Codex，不能作为指令或权限来源。工作目录、模型和推理强度不属于请求参数；新会话读取服务默认值并保存，默认配置变化不能悄悄改变既有会话。
 
 业务 `sessionId` 映射到内部 Codex thread ID，二者不混用。无效 session 不静默创建新线程。同一幂等键和相同参数返回原任务，参数改变报冲突；幂等键不是会话 ID，也不保证上游模型计费的全链路 exactly-once。
 
@@ -66,8 +66,8 @@ service 不扫描 skill、不合并文件为 developer instructions，也不根�
 
 ## 固定执行能力与范围
 
-执行固定 `danger-full-access`、approval `never`、network enabled，并开启实时 Web 搜索；API 和服务 YAML 不提供权限切换。网关不限制 Codex 的本地命令、文件写入、网络或原生 MCP 能力。
+执行使用请求的 `sandboxMode`，省略时采用服务默认值，支持 SDK 原生的 `read-only`、`workspace-write`、`danger-full-access`。模式按任务保存，排队恢复与失败重试保留原值；同会话不同轮次可以各自指定，不修改历史任务。审批保持 `never`，不自动扩大权限；枚举范围见 [接口说明](http-api.md#sandboxmode)。
 
 共享 Token 对应一个可信接入域，可见全部任务。固定工作目录不是访问授权或文件边界。调用方负责请求过滤；Codex 能实际操作的资源由服务进程、容器、操作系统账户、网络和外部凭据决定。
 
-本版不提供复杂 RBAC、多租户隔离、集群调度或请求级权限沙箱。保留 Runner/Store 扩展点不等于这些功能已实现或已验证。
+本版不提供复杂 RBAC、多租户隔离或集群调度。请求权限使用 Codex 原生沙箱，不实现自有沙箱。保留 Runner/Store 扩展点不等于这些功能已实现或已验证。

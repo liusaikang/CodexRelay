@@ -2,7 +2,7 @@
 
 ## 运行方式
 
-Windows 可在 PowerShell 启动并用 Ctrl+C 正常退出。真实任务固定使用 `danger-full-access`、approval `never`、network enabled 和实时 Web 搜索；不提供请求级权限切换。运行账户和容器拥有什么权限，由部署方决定。
+Windows 可在 PowerShell 启动并用 Ctrl+C 正常退出。请求可以通过 `sandboxMode` 指定本次任务的 SDK 原生沙箱模式；省略采用服务默认值。保持 approval `never` 和实时 Web 搜索。修改服务默认值需重启，不改变已接收任务的权限，详情见 [执行权限](configuration.md#执行权限)。
 
 需要登录认证时，在仓库根目录为服务使用专用 home：
 

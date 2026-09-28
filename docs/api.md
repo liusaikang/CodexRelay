@@ -1,5 +1,7 @@
 # MCP 与 HTTP 接口
 
+首次接入请先阅读 [MCP 接入指南](mcp.md) 或 [HTTP API](http-api.md)。本文保留登录、调用日志等详细约定。
+
 本文描述原生 Codex SDK 任务网关的新接口契约；迁移验证见 [验收记录](verification.md)。业务 HTTP API 与 `/mcp` 使用 `Authorization: Bearer <CODEX_MCP_TOKEN>`。同一实例的共享 Token 可以访问全部任务和会话，不提供复杂 RBAC；业务后端负责用户授权。
 
 ## 提交字段
@@ -12,8 +14,9 @@ HTTP `POST /v1/tasks` 与 MCP `codex_submit_task` 使用同一输入：
 | context | 否 | 本次任务的结构化参考数据，必须是 JSON 对象，UTF-8 序列化后不超过 16 KiB |
 | sessionId | 否 | 续接已有 v2 会话；省略则创建会话 |
 | idempotencyKey | 否 | 同一次提交的重试去重键 |
+| sandboxMode | 否 | 本次任务使用的 SDK 原生沙箱模式；省略采用服务默认值 |
 
-只有上述四个字段属于提交契约。不要提交 `workingDirectory`、`model`、`modelReasoningEffort`、旧 `projectKey`、`capability`，也不能传 skill 列表、MCP 定义、环境变量、CLI 参数、凭据或 sandbox 设置。执行目录、模型、推理强度及 `danger-full-access`、approval `never`、network enabled、实时 Web 搜索策略由服务固定。
+只有上述五个字段属于提交契约。不要提交 `workingDirectory`、`model`、`modelReasoningEffort`、旧 `projectKey`、`capability`，也不能传 skill 列表、MCP 定义、环境变量、CLI 参数或凭据。执行目录、模型、推理强度由服务配置决定；`sandboxMode` 枚举及权限范围见 [接口说明](http-api.md#sandboxmode)。
 
 `context` 会随任务记录持久化并进入 Codex 会话。它是参考数据，不是系统指令；调用方应只传排查所需的最少信息，不传密码、Token、Cookie 或其他秘密。追问未传 `context` 时不会自动复制上一任务的对象，但原生 Codex 线程仍保留已有对话上下文。
 
@@ -32,7 +35,7 @@ HTTP `POST /v1/tasks` 与 MCP `codex_submit_task` 使用同一输入：
 | 工具 | 输入 | 返回用途 |
 | --- | --- | --- |
 | codex_get_service_info | 无 | 服务信息、默认设置与固定执行边界，不是 skill 清单 |
-| codex_submit_task | question，context?，sessionId?，idempotencyKey? | 提交任务并返回任务标识和状态 |
+| codex_submit_task | question，context?，sessionId?，idempotencyKey?，sandboxMode? | 提交任务并返回任务标识和状态 |
 | codex_get_task | taskId | 状态、最近进度、结果与错误 |
 | codex_cancel_task | taskId | 请求取消后的当前状态 |
 | codex_list_sessions | offset?, limit? | 会话分页 |
@@ -63,6 +66,8 @@ stdio 依赖本机操作系统权限，日志写 stderr，stdout 留给协议。
 | GET | /v1/admin/invocations/summary | 筛选范围内的统计 |
 | GET | /v1/admin/invocations/:taskId | 完整提示词、上下文、结果与用量 |
 | POST | /v1/tasks | 提交任务，HTTP 202 |
+| GET | /v1/tasks | 全局任务摘要与筛选，见 HTTP API |
+| POST | /v1/tasks/:taskId/retry | 新会话重试失败任务，需要 idempotencyKey |
 | GET | /v1/tasks/:taskId | 查询任务 |
 | POST | /v1/tasks/:taskId/cancel | 请求取消 |
 | POST | /v1/sessions/:sessionId/resume | 确认忽略指定失败前序，继续排队 |
@@ -101,7 +106,7 @@ Invoke-RestMethod "http://127.0.0.1:8787/v1/tasks/$($task.taskId)" -Headers $hea
 
 规则与恢复操作见 [任务调度](scheduling.md)。过载返回 429（`ADMISSION_FULL` / `QUEUE_FULL`）；排队过期为终态 `timed_out`，错误码 `QUEUE_EXPIRED`。queued 任务包含 `scheduling.reason`、可选 `blockedByTaskId` 和截止时间。健康接口增加 `receiving`、`blocked`、`admissionLimit`；`blocked` 包含在 `queued` 中。
 
-恢复接口请求体为 `{ "blockedByTaskId": "task_<失败任务ID>" }`，同样要求 Bearer Token，只确认后续任务继续，不重跑旧任务，不延长排队期限。提交四参数及 MCP 六工具不变。
+恢复接口请求体为 `{ "blockedByTaskId": "task_<失败任务ID>" }`，同样要求 Bearer Token，只确认后续任务继续，不重跑旧任务，不延长排队期限。MCP 六工具不变。
 
 ## 运维控制台会话排查
 

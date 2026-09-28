@@ -18,6 +18,8 @@ rows[24] = { ...rows[24], status: 'queued', result: undefined, startedAt: undefi
   scheduling: { reason: 'previous_task_failed', blockedByTaskId: tid(24), queueExpiresAt: '2026-09-24T10:00:00.000Z' } };
 const sessions = [1, 2].map(n => ({ sessionId: sid(n), createdAt: '2026-09-24T00:00:00Z', workingDirectory: '/workspace/example' }));
 let failTask = false, delaySession = false, releaseSession;
+let delayRetry = false, releaseRetry, failSessionList = false;
+const retryRequests = [];
 const errors = [];
 const submissions = [];
 const resumptions = [];
@@ -35,7 +37,10 @@ try {
     if (path === '/v1/admin/account') return json({ available: true, authenticated: false });
     if (path === '/v1/info') return json({ runner: 'codex', maxConcurrent: 3, maxQueued: 100, defaultWorkingDirectory: '/workspace/example' });
     if (path === '/v1/health') return json({ ready: true, running: 1, queued: 1, receiving: 2, blocked: 1, runner: 'codex' });
-    if (path === '/v1/sessions') return json({ items: sessions, total: 2, offset: 0, limit: 6 });
+    if (path === '/v1/sessions') {
+      if (failSessionList) return route.fulfill({status:503,json:{error:{message:'session list unavailable'}}});
+      return json({ items: sessions, total: sessions.length, offset: 0, limit: 6 });
+    }
     if (path === '/v1/tasks' && route.request().method() === 'POST') {
       const input = route.request().postDataJSON(); submissions.push(input);
       const accepted = { ...task(52,input.sessionId || sid(1)), request: input };
@@ -52,6 +57,13 @@ try {
       if (delaySession && id === sid(1)) { delaySession = false; await new Promise(resolve => { releaseSession = resolve; }); }
       const tasks = rows.filter(t => t.sessionId === id), offset = Number(url.searchParams.get('offset') || 0), limit = Number(url.searchParams.get('limit') || 20);
       return json({ ...session, tasks: { total: tasks.length, offset, limit, items: tasks.slice(offset, offset + limit).map(t => ({ taskId: t.taskId, status: t.status, question: t.request.question, createdAt: t.createdAt })) } });
+    }
+    if (path === `/v1/tasks/${tid(24)}/retry`) {
+      retryRequests.push(route.request().postDataJSON());
+      if (delayRetry) { delayRetry = false; await new Promise(resolve => { releaseRetry = resolve; }); }
+      const id = sid(2+retryRequests.length), created = {...task(69+retryRequests.length,id),retryOfTaskId:tid(24)};
+      rows.push(created); sessions.push({sessionId:id,createdAt:created.createdAt,workingDirectory:'/workspace/example'});
+      return route.fulfill({status:202,json:created});
     }
     if (path.startsWith('/v1/tasks/')) {
       const item = rows.find(t => t.taskId === path.split('/').at(-1));
@@ -148,6 +160,24 @@ try {
   await page.getByRole('button', { name: '新建会话', exact: true }).click();
   await expect(page.locator('#turns article')).toHaveCount(0);
   await expect(page.locator('#session')).toHaveValue('');
+  await page.locator('#sessions button').first().click();
+  delayRetry = true;
+  page.once('dialog',dialog => dialog.accept());
+  await page.locator(`article[data-task-id="${tid(24)}"]`).getByRole('button',{name:'新会话重试',exact:true}).click();
+  await expect.poll(() => !!releaseRetry).toBe(true);
+  await page.locator('#sessions button').nth(1).click();
+  await expect(page.locator('#session')).toHaveValue(sid(2));
+  await page.getByLabel('问题内容').fill('这是第二个会话的草稿');
+  releaseRetry();
+  await expect(page.locator('#task-message')).toContainText('当前会话与草稿保持不变');
+  await expect(page.locator('#session')).toHaveValue(sid(2));
+  await expect(page.getByLabel('问题内容')).toHaveValue('这是第二个会话的草稿');
+  await page.locator('#sessions button').first().click();
+  failSessionList = true;
+  page.once('dialog',dialog => dialog.accept());
+  await page.locator(`article[data-task-id="${tid(24)}"]`).getByRole('button',{name:'新会话重试',exact:true}).click();
+  await expect(page.locator('#task-message')).toContainText(`重试已接收：${tid(71)}，页面同步失败`);
+  await expect(page.locator('#task-message')).not.toContainText('操作未确认完成');
   assert.deepEqual(errors, []);
   console.log('Session smoke passed: latest/older turns, queue/running/failure, diagnostics, lookup, stale responses, retry, layouts. No real tasks submitted.');
-} finally { releaseSession?.(); await browser.close(); }
+} finally { releaseSession?.(); releaseRetry?.(); await browser.close(); }

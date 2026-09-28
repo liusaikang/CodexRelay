@@ -16,7 +16,7 @@ CodexMCP 是面向可信业务后端的原生 Codex SDK 任务网关。网关负
 
 服务 YAML 使用 `dataDir`、`server`、`tasks`、顶层 `runner` 和 `codex`。不恢复旧 `projects`、`capabilities`、`promptFile`、`skillFiles` 或 `mcpServers` 配置；迁移后的结构见 [配置文档](docs/configuration.md)。
 
-提交契约严格限定为必填 `question`，以及可选 `context`、`sessionId`、`idempotencyKey`。`context` 必须是最多 16 KiB 的 JSON 对象；工作目录、模型和推理强度只能由服务配置决定。执行策略固定为 `danger-full-access`、approval `never`、network enabled 和实时 Web 搜索，不开放请求级权限切换。
+提交契约严格限定为必填 `question`，以及可选 `context`、`sessionId`、`idempotencyKey`、`sandboxMode`。`context` 必须是最多 16 KiB 的 JSON 对象；工作目录、模型和推理强度只能由服务配置决定。`sandboxMode` 使用 SDK 原生枚举，请求省略时采用服务默认值，任务接收后固定，重试保留原值。审批保持 `never`，权限范围见 [接口说明](docs/http-api.md#sandboxmode)。
 
 HTTP 与 MCP 共享任务语义，服务信息使用 `/v1/info` 和 `codex_get_service_info`，MCP 保持六个工具。共享 Token 只面向可信后端，不把目录参数或会话 ID 当作用户授权，不宣称复杂 RBAC 或多租户隔离。
 
@@ -40,7 +40,9 @@ npm run release:check
 
 客户端使用可选 `--context`，保留 `--inline-example`；上下文直传成功不代表 Codex 自动读取文件或使用 skill 成功。新增验证记录到 [verification.md](docs/verification.md)，注明执行环境、命令、证据来源及未覆盖项，不重复沿用旧方案的通过次数。
 
-当前 `npm run verify` 已通过 34 项测试，覆盖 SDK 替身、HTTP、MCP、stdio、四字段提交契约和旧记录兼容。后续修改仍需重新执行检查并更新验收记录。Docker 文件与配置已迁移但尚未实跑，不因 Dockerfile 或 Compose 已存在就声称部署和沙箱已验证。
+测试覆盖 SDK 替身、HTTP、MCP、stdio、四字段提交契约和旧记录兼容。每次修改后重新执行检查；当前结果统一维护在 [验证说明](docs/verification.md)。容器检查脚本不调用真实模型，不能代替目标部署环境的真实认证与执行验证。
+
+公开截图通过 `npm run docs:screenshots` 生成，使用受控合成数据，不连接真实服务。浏览器脚本默认使用 Chromium；本机可设置 `BROWSER_CHANNEL=msedge`。图像直接提交到 `docs/images`，不走 Git LFS。
 
 ## 发布要求
 

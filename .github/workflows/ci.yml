@@ -1,5 +1,10 @@
 name: verify
 on: [push, pull_request]
+permissions:
+  contents: read
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   test:
     strategy:
@@ -7,6 +12,7 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
         node: [22, 24]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -18,3 +24,27 @@ jobs:
       - run: npm run release:check
       - run: npx playwright install --with-deps chromium
       - run: npm run smoke:browser
+  container:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm run init:env
+      - run: docker compose config --quiet
+      - run: docker compose build
+      - run: docker compose run --rm codex-mcp node scripts/container-smoke.mjs
+      - run: docker compose up -d --wait --wait-timeout 60
+      - if: always()
+        run: docker compose down
+  secrets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Scan reachable Git history (redacted)
+        run: docker run --rm -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=/repo -v "$PWD:/repo:ro" ghcr.io/gitleaks/gitleaks:v8.24.2 git /repo --log-opts="--all" --redact --no-banner

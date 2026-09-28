@@ -49,6 +49,50 @@ it('serves protected account status and supports a forced refresh', async () => 
   expect(refreshed.quota.primary.remainingPercent).toBe(59);
 });
 
+it('accepts native sandbox modes over HTTP and MCP and rejects unknown values', async () => {
+  service.config.sandboxMode = 'read-only';
+  expect(await (await fetch(`${base}/v1/info`, { headers })).json()).toMatchObject({ accessMode: 'read-only', readOnly: true });
+  const accepted = await fetch(`${base}/v1/tasks`, { method: 'POST', headers,
+    body: JSON.stringify({ question: 'Analyze', sandboxMode: 'danger-full-access' }) });
+  expect(accepted.status).toBe(202);
+  expect(await accepted.json()).toMatchObject({ sandboxMode: 'danger-full-access', request: { sandboxMode: 'danger-full-access' } });
+  expect((await fetch(`${base}/v1/tasks`, { method: 'POST', headers,
+    body: JSON.stringify({ question: 'Analyze', sandboxMode: 'readonly' }) })).status).toBe(400);
+  const client = new Client({ name: 'sandbox-test', version: '1' });
+  try {
+    await client.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp`), { requestInit: { headers } }));
+    const info = await client.callTool({ name: 'codex_get_service_info', arguments: {} });
+    expect(info.structuredContent).toMatchObject({ data: { accessMode: 'read-only', readOnly: true } });
+    const allowed = await client.callTool({ name: 'codex_submit_task', arguments: { question: 'Analyze', sandboxMode: 'workspace-write' } });
+    expect(allowed.structuredContent).toMatchObject({ data: { sandboxMode: 'workspace-write' } });
+    const rejected = await client.callTool({ name: 'codex_submit_task', arguments: { question: 'Analyze', sandboxMode: 'invented' } });
+    expect(rejected.isError).toBe(true);
+    expect(service.listSessions(0, 20).total).toBe(2);
+  } finally { await client.close(); }
+});
+
+it('protects task listing and validates retry requests without widening submission fields', async () => {
+  expect((await fetch(`${base}/v1/tasks`)).status).toBe(401);
+  expect((await fetch(`${base}/assets/queue.js`)).status).toBe(401);
+  expect((await fetch(`${base}/v1/tasks?status=invalid`, {headers})).status).toBe(400);
+  expect((await fetch(`${base}/v1/tasks?limit=101`, {headers})).status).toBe(400);
+  const task = await service.submit({question:'retry fixture'});
+  await service.cancel(task.taskId);
+  for (let i = 0; i < 100 && service.getTask(task.taskId).status === 'running'; i++) await new Promise(resolve => setTimeout(resolve,10));
+  const url = `${base}/v1/tasks/${task.taskId}/retry`;
+  expect((await fetch(url,{method:'POST'})).status).toBe(401);
+  expect((await fetch(url,{method:'POST',headers,body:'{}'})).status).toBe(400);
+  const body = JSON.stringify({idempotencyKey:'test-retry'});
+  const first = await fetch(url,{method:'POST',headers,body});
+  expect(first.status).toBe(202);
+  const retried = await first.json();
+  expect(retried.retryOfTaskId).toBe(task.taskId);
+  expect((await (await fetch(url,{method:'POST',headers,body})).json()).taskId).toBe(retried.taskId);
+  const listing = await (await fetch(`${base}/v1/tasks?status=all&keyword=${task.taskId}`,{headers})).json();
+  expect(listing.total).toBe(1);
+  expect(listing.items[0].request).toBeUndefined();
+});
+
 it('limits live settings to the console session and applies validated changes', async () => {
   const url = `${base}/console/settings`;
   expect((await fetch(url)).status).toBe(401);
@@ -196,10 +240,13 @@ it('serves discovery, submission, follow-up and errors to the official MCP clien
   const client = new Client({ name: 'integration-test', version: '1.0.0' });
   try {
     await client.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp`), { requestInit: { headers: { Authorization: `Bearer ${token}` } } }));
+    const invalid = await client.callTool({name:'codex_submit_task',arguments:{question:'must reject',workingDirectory:'/not-allowed',model:'not-allowed'}});
+    expect(invalid.isError).toBe(true);
+    expect(service.listSessions(0,20).total).toBe(0);
     const tools = await client.listTools();
     expect(tools.tools).toHaveLength(6);
     const submit = tools.tools.find(tool => tool.name === 'codex_submit_task')!;
-    expect(Object.keys(submit.inputSchema.properties ?? {}).sort()).toEqual(['context', 'idempotencyKey', 'question', 'sessionId']);
+    expect(Object.keys(submit.inputSchema.properties ?? {}).sort()).toEqual(['context', 'idempotencyKey', 'question', 'sandboxMode', 'sessionId']);
     expect(submit.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true, openWorldHint: true });
     expect(tools.tools.map(tool => tool.name)).toContain('codex_get_service_info');
     const first = await client.callTool({ name: 'codex_submit_task', arguments: { question: '为什么看不到数据' } });

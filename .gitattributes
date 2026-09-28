@@ -8,3 +8,5 @@
 *.ttf filter=lfs diff=lfs merge=binary -text
 *.pyc filter=lfs diff=lfs merge=binary -text
 *.jpg filter=lfs diff=lfs merge=binary -text
+# Public documentation screenshots are small and must render without Git LFS.
+docs/images/*.png -filter -diff -merge -text

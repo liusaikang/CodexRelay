@@ -11,13 +11,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 ENV NODE_ENV=production HOME=/data/home CODEX_HOME=/data/codex-home
+ENV PATH=/app/node_modules/.bin:$PATH
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY package.json ./
 COPY public ./public
 COPY config ./config
+COPY scripts/container-smoke.mjs ./scripts/container-smoke.mjs
 COPY examples/workspace ./examples/workspace
-RUN mkdir -p /data/home /data/production-service /data/production-invocation-logs /data/codex-home && chown -R node:node /data
+RUN mkdir -p /data/home /data/production-service /data/production-invocation-logs /data/codex-home && chown -R node:node /data \
+    && codex --version
 USER node
 EXPOSE 8787
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \

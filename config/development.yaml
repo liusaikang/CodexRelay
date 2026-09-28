@@ -21,6 +21,7 @@ tasks:
   queueTimeoutSeconds: 1800
 runner: codex
 codex:
+  sandboxMode: ${CODEX_SANDBOX_MODE:-danger-full-access}
   home: ../data/codex-home
   defaultWorkingDirectory: ../examples/workspace
   defaultModel: ${CODEX_MODEL:-}

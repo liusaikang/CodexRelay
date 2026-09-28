@@ -40,6 +40,7 @@ codex:
   defaultWorkingDirectory: ../examples/workspace
   defaultModel: ${CODEX_MODEL:-}
   defaultReasoningEffort: ${CODEX_MODEL_REASONING_EFFORT:-}
+  sandboxMode: ${CODEX_SANDBOX_MODE:-danger-full-access}
   # path: /absolute/path/to/codex
 ```
 
@@ -78,7 +79,25 @@ invocationLog:
 
 已有会话使用创建时保存的目录、模型和推理强度，服务默认值后续变化不会悄悄改写旧会话。需要采用新执行配置时创建新会话。
 
-请求只接受 `question`、`context`、`sessionId`、`idempotencyKey`，不接受超时、执行目录、模型、推理强度、环境变量、CLI 路径、Codex home、原生配置或 sandbox 覆盖。执行策略固定为 `danger-full-access`、approval `never`、network enabled、实时 Web 搜索开启；服务 YAML 不提供权限裁剪选项。
+请求只接受 `question`、`context`、`sessionId`、`idempotencyKey`、`sandboxMode`，不接受超时、执行目录、模型、推理强度、环境变量、CLI 路径、Codex home 或原生配置覆盖。
+
+## 执行权限
+
+提交接口的可选参数 `sandboxMode` 直接采用 Codex SDK 原生枚举：`read-only`、`workspace-write`、`danger-full-access`。各选项的权限范围及请求示例见 [HTTP API](http-api.md#sandboxmode)，MCP 使用相同参数。
+
+服务配置 `codex.sandboxMode` 仅作为请求省略该参数时的默认值，未配置时保持 `danger-full-access`。开发和生产配置均可通过环境变量指定默认值：
+
+```dotenv
+CODEX_SANDBOX_MODE=read-only
+```
+
+也可在所用 YAML 的 `codex` 下直接填写 `sandboxMode: read-only`。修改服务默认值需重启，不属于控制台热更新；请求显式选择则在本次任务生效，无需重启。非法值被拒绝，不自动回退。
+
+每轮请求独立选择模式，排队时保存实际选定值。追问省略参数时仍采用当前服务默认值；修改默认值不改变已接收任务、历史会话或失败重试的权限。
+
+`npm run check:dev` / `npm run check:prod` 展示启动默认值，`GET /v1/info` 或 MCP `codex_get_service_info` 的 `accessMode` 展示运行中的默认值；单个任务响应顶层 `sandboxMode` 是该任务实际选定值。这些字段反映配置，目标平台沙箱能力需在部署环境验收。
+
+只读模式约束任务工具执行，不禁止服务保存自身任务、会话和日志。沙箱与审批区别参见 [官方说明](https://learn.chatgpt.com/docs/agent-approvals-security)。
 
 ## 原生 Skills 与项目说明
 
@@ -97,7 +116,7 @@ description: 分析日志问题时关联源码与请求上下文，输出证据�
 
 网关不读取、扫描、拼接、注册或路由这些 skill。Codex 负责原生发现和使用；不要把 skill 正文重新合并为网关 developer instructions。目录必须是 `.agents`，不是 `.agent`。仓库级发现沿任务工作目录向上到仓库根目录，不会递归发现任意 service 源目录中的 skill。格式与发现规则以 [官方 Build skills](https://learn.chatgpt.com/docs/build-skills) 为准。
 
-原生 skill 不是强制工具调用机制或安全边界；发现或装载成功不等于指定工具必定执行。网关给予 Codex 完整执行能力，上游 MCP 权限由接入方和部署环境决定，详见 [安全说明](../SECURITY.md)。
+原生 skill 不是强制工具调用机制或安全边界；发现或装载成功不等于指定工具必定执行。Codex 本地执行使用配置的沙箱模式，上游 MCP 权限由接入方和部署环境决定，详见 [安全说明](../SECURITY.md)。
 
 ## 原生 MCP 与环境
 

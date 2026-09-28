@@ -1,12 +1,16 @@
 import { z } from 'zod';
+import type { SandboxMode } from '@openai/codex-sdk';
 
 export const idSchema = z.string().regex(/^(?:task|sess)_[0-9a-f-]{36}$/);
+const sandboxModes = ['read-only', 'workspace-write', 'danger-full-access'] as const satisfies readonly SandboxMode[];
+export const sandboxModeSchema = z.enum(sandboxModes);
 export const modelReasoningEffortSchema = z.enum(['minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra', 'persistent']);
 export const contextSchema = z.record(z.string().min(1).max(128), z.json())
   .refine(value => Buffer.byteLength(JSON.stringify(value), 'utf8') <= 16 * 1024, 'Context must not exceed 16 KiB');
 export const submitSchema = z.object({
   question: z.string().min(1).max(32000).refine(value => value.trim().length > 0, 'Question must not be blank'),
   context: contextSchema.optional(),
+  sandboxMode: sandboxModeSchema.optional(),
   sessionId: idSchema.optional(),
   idempotencyKey: z.string().min(1).max(128).optional(),
 }).strict();
@@ -16,6 +20,13 @@ export const pageSchema = z.object({
   limit: z.number().int().min(1).max(100).default(20),
 });
 export const statusSchema = z.enum(['queued', 'running', 'succeeded', 'failed', 'cancelled', 'timed_out', 'interrupted']);
+export const taskListSchema = z.object({
+  offset: z.coerce.number().int().min(0).default(0),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  status: z.enum(['active', 'all', ...statusSchema.options]).default('active'),
+  keyword: z.string().max(200).default(''),
+}).strict();
+export const retrySchema = z.object({ idempotencyKey: z.string().min(1).max(128) }).strict();
 export const progressSchema = z.object({ at: z.string(), kind: z.string(), detail: z.string() });
 export const resultSchema = z.object({ markdown: z.string(), usage: z.record(z.string(), z.number()).nullable() });
 // Legacy routing fields are accepted only from persisted records, never from submissions.
@@ -26,10 +37,12 @@ const storedRequestSchema = submitSchema.extend({
 export const taskSchema = z.object({
   version: z.union([z.literal(1), z.literal(2)]), taskId: idSchema, sessionId: idSchema,
   request: storedRequestSchema, requestHash: z.string(), configHash: z.string(),
+  sandboxMode: sandboxModeSchema.optional(),
   status: statusSchema, createdAt: z.string(), startedAt: z.string().optional(), finishedAt: z.string().optional(),
   enqueueSequence: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
   queueExpiresAt: z.string().datetime().optional(),
   dependsOnTaskId: idSchema.optional(), dependencyApprovedAt: z.string().datetime().optional(),
+  retryOfTaskId: idSchema.optional(),
   invocationTransport: z.enum(['http', 'mcp', 'stdio']).optional(),
   stopReason: z.enum(['cancelled', 'timed_out', 'interrupted']).optional(),
   error: z.object({ code: z.string(), message: z.string() }).optional(),
@@ -45,6 +58,7 @@ export type Task = z.infer<typeof taskSchema>;
 export type Session = z.infer<typeof sessionSchema>;
 export type RunResult = z.infer<typeof resultSchema>;
 export interface RuntimeConfig {
+  sandboxMode?: z.infer<typeof sandboxModeSchema>;
   invocationLog?: { enabled: boolean; directory: string; retentionDays: number };
   dataDir: string; codexHome: string; host: string; port: number;
   tokenEnv: string; localConsole?: boolean; allowedHosts: string[]; allowedOrigins: string[];
@@ -55,6 +69,7 @@ export interface RuntimeConfig {
   defaultModel?: string; defaultReasoningEffort?: z.infer<typeof modelReasoningEffortSchema>;
 }
 export interface Execution {
+  sandboxMode?: z.infer<typeof sandboxModeSchema>;
   taskId: string; question: string; context?: z.infer<typeof contextSchema>; directory: string;
   codexHome: string; threadId?: string; model?: string; modelReasoningEffort?: z.infer<typeof modelReasoningEffortSchema>; codexPath?: string;
   env: Record<string, string>;

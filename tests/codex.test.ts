@@ -19,7 +19,7 @@ vi.mock('@openai/codex-sdk', () => ({ Codex: class {
 } }));
 import { runCodex } from '../src/runner/codex.js';
 beforeEach(() => { sdk.resumed = undefined; });
-it.each([undefined, 'existing-thread'])('starts or resumes with fixed full-access policy (%s)', async threadId => {
+it.each([undefined, 'existing-thread'])('starts or resumes with default full-access policy (%s)', async threadId => {
   const dir = await mkdtemp(join(tmpdir(), 'codex-adapter-'));
   try {
     const signal = new AbortController().signal;
@@ -32,6 +32,18 @@ it.each([undefined, 'existing-thread'])('starts or resumes with fixed full-acces
     expect(sdk.turn.signal).toBe(signal);
     expect(sdk.resumed).toBe(threadId);
     expect(result.usage?.output_tokens).toBe(5);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+it.each(['read-only', 'workspace-write', 'danger-full-access'] as const)('uses configured sandbox %s for new and resumed threads', async sandboxMode => {
+  const dir = await mkdtemp(join(tmpdir(), 'codex-sandbox-'));
+  try {
+    for (const threadId of [undefined, 'existing-thread']) {
+      await runCodex({ taskId: 'policy', question: 'Analyze', directory: dir, codexHome: dir,
+        env: {}, sandboxMode, threadId }, new AbortController().signal, async () => {});
+      expect(sdk.options).toMatchObject({ sandboxMode, approvalPolicy: 'never',
+        networkAccessEnabled: sandboxMode !== 'read-only', webSearchMode: 'live' });
+    }
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 

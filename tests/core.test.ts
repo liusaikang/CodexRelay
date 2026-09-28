@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 import { FileStore } from '../src/storage.js';
 import { TaskService } from '../src/service.js';
 import type { Execution, Runner, RuntimeConfig } from '../src/types.js';
@@ -45,6 +46,54 @@ async function fixture(maxConcurrent = 2, maxQueued = 2, timeoutSeconds = 30) {
 const input = { question: 'Why is this failing?' };
 
 describe('durable task scheduling', () => {
+  it('pins each task sandbox across queuing and restart while preserving old session hashes', async () => {
+    const { service, runner, config, dir } = await fixture(1);
+    const first = await service.submit(input);
+    await until(() => runner.calls.length === 1);
+    const savedSession = JSON.parse(await readFile(join(dir, 'sessions', `${first.sessionId}.json`), 'utf8'));
+    const oldHash = createHash('sha256').update(JSON.stringify({ policy: 'native-full-access-v1',
+      directory: await realpath(config.defaultWorkingDirectory), model: config.defaultModel,
+      modelReasoningEffort: config.defaultReasoningEffort, codexHome: config.codexHome,
+      runner: config.runner, envAllowlist: config.envAllowlist, codexPath: config.codexPath })).digest('hex');
+    expect(savedSession.configHash).toBe(oldHash);
+    runner.calls[0]!.finish();
+    await until(() => service.getTask(first.taskId).status === 'succeeded');
+    config.sandboxMode = 'danger-full-access';
+    await service.submit({ ...input, sessionId: first.sessionId, sandboxMode: 'workspace-write' });
+    await until(() => runner.calls.length === 2);
+    expect(runner.calls[1]!.execution).toMatchObject({ sandboxMode: 'workspace-write', threadId: 'thread-0' });
+    const queued = await service.submit(input);
+    await service.close();
+    const nextRunner = new ControlledRunner();
+    const next = new TaskService({ ...config, sandboxMode: 'read-only' }, new FileStore(dir), nextRunner);
+    await next.init(); cleanup.push(() => next.close());
+    await until(() => nextRunner.calls.length === 1);
+    expect(nextRunner.calls[0]!.execution).toMatchObject({ taskId: queued.taskId, sandboxMode: 'danger-full-access' });
+    expect(next.getTask(first.taskId).result?.markdown).toBe('Verified result');
+    expect(next.info()).toMatchObject({ accessMode: 'read-only', readOnly: true, networkAccess: false });
+    await expect(next.submit({ ...input, sandboxMode: 'invented' } as any)).rejects.toThrow();
+    await next.submit({ ...input, sessionId: first.sessionId });
+    nextRunner.calls[0]!.finish();
+    await until(() => nextRunner.calls.length === 2);
+    expect(nextRunner.calls[1]!.execution).toMatchObject({ sandboxMode: 'read-only', threadId: 'thread-0' });
+  });
+
+  it('keeps permission selection in idempotency and retries without upgrading a task', async () => {
+    const { service, runner, config } = await fixture();
+    const request = { ...input, sandboxMode: 'read-only' as const, idempotencyKey: 'sandbox-request' };
+    const original = await service.submit(request);
+    expect((await service.submit(request)).taskId).toBe(original.taskId);
+    await expect(service.submit({ ...request, sandboxMode: 'danger-full-access' })).rejects.toMatchObject({ code: 'IDEMPOTENCY_CONFLICT' });
+    await until(() => runner.calls.length === 1);
+    await service.cancel(original.taskId);
+    await until(() => service.getTask(original.taskId).status === 'cancelled');
+    config.sandboxMode = 'danger-full-access';
+    const retried = await service.retry(original.taskId, 'retry-sandbox');
+    await until(() => runner.calls.length === 2);
+    expect(retried.sandboxMode).toBe('read-only');
+    expect(runner.calls[1]!.execution.sandboxMode).toBe('read-only');
+  });
+
   it('bounds global concurrency, rejects a full queue and does not create extra sessions', async () => {
     const { service, runner } = await fixture(2, 1);
     await Promise.all([service.submit(input), service.submit(input), service.submit(input)]);

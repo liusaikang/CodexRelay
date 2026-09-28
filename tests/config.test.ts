@@ -5,6 +5,35 @@ import { join, resolve } from 'node:path';
 import { parse, stringify } from 'yaml';
 import { loadConfig } from '../src/config.js';
 
+it('validates sandbox modes and expands their environment configuration', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'relay-sandbox-config-'));
+  const previous = process.env.RELAY_TEST_SANDBOX;
+  try {
+    const file = join(dir, 'config.yaml');
+    const save = async (sandboxMode?: unknown) => writeFile(file, stringify({ codex: { defaultWorkingDirectory: '.', sandboxMode } }));
+    await save();
+    expect((await loadConfig(file)).sandboxMode).toBe('danger-full-access');
+    for (const mode of ['read-only', 'workspace-write', 'danger-full-access']) {
+      await save(mode);
+      expect((await loadConfig(file)).sandboxMode).toBe(mode);
+      process.env.RELAY_TEST_SANDBOX = mode;
+      await save('${RELAY_TEST_SANDBOX}');
+      expect((await loadConfig(file)).sandboxMode).toBe(mode);
+    }
+    for (const mode of ['readonly', '', 'full', false]) {
+      await save(mode);
+      await expect(loadConfig(file)).rejects.toThrow();
+    }
+    process.env.RELAY_TEST_SANDBOX = 'invalid';
+    await save('${RELAY_TEST_SANDBOX}');
+    await expect(loadConfig(file)).rejects.toThrow();
+  } finally {
+    if (previous === undefined) delete process.env.RELAY_TEST_SANDBOX;
+    else process.env.RELAY_TEST_SANDBOX = previous;
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 it('loads the development environment with its existing history and invocation log', async () => {
   const config = await loadConfig(resolve('config/development.yaml'));
   expect(config.defaultWorkingDirectory).toBe(await realpath('examples/workspace'));

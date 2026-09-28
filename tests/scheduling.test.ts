@@ -38,6 +38,42 @@ async function fixture(overrides: Partial<RuntimeConfig> = {}) {
   return { config, runner, store, service, dir };
 }
 
+it('lists queue summaries with arrival positions, filtering and no raw context', async () => {
+  const { service } = await fixture({ maxConcurrent: 1 });
+  const first = await service.submit({ question: 'running', context: { privateReference: 'fixture' } });
+  const second = await service.submit({ question: 'waiting', sessionId: first.sessionId });
+  const third = await service.submit({ question: 'independent' });
+  const list = service.listTasks({ offset: 0, limit: 20, status: 'active' });
+  expect(list.items.map(t => t.taskId)).toEqual([first.taskId, second.taskId, third.taskId]);
+  expect(list.items[1]).toMatchObject({ queuePosition: 1, scheduling: { reason: 'session_active' } });
+  expect(list.items[2]).toMatchObject({ queuePosition: 2, scheduling: { reason: 'capacity' } });
+  expect(JSON.stringify(list)).not.toContain('privateReference');
+  expect(service.listTasks({ offset: 0, limit: 1, status: 'queued', keyword: third.taskId }).total).toBe(1);
+  await service.cancel(second.taskId);
+  expect(service.listTasks({ offset: 0, limit: 20, status: 'queued' }).items[0]).toMatchObject({ taskId: third.taskId, queuePosition: 1 });
+});
+
+it('retries terminal failures in a new session once per retry key and retains provenance after restart', async () => {
+  const { service, runner, config } = await fixture();
+  const original = await service.submit({ question: 'failed work', context: { source: 'synthetic' }, idempotencyKey: 'original' });
+  await expect(service.retry(original.taskId, 'attempt-1')).rejects.toMatchObject({ code: 'TASK_NOT_RETRYABLE' });
+  runner.calls[0]!.fail();
+  await until(() => service.getTask(original.taskId).status === 'failed');
+  const [retry, duplicate] = await Promise.all([service.retry(original.taskId, 'attempt-1'), service.retry(original.taskId, 'attempt-1')]);
+  expect(retry.taskId).toBe(duplicate.taskId);
+  expect(retry.sessionId).not.toBe(original.sessionId);
+  expect(retry).toMatchObject({ retryOfTaskId: original.taskId, request: { question: 'failed work', context: { source: 'synthetic' } } });
+  expect(service.getTask(original.taskId).status).toBe('failed');
+  runner.calls[1]!.finish();
+  await until(() => service.getTask(retry.taskId).status === 'succeeded');
+  await expect(service.retry(retry.taskId, 'attempt-2')).rejects.toMatchObject({ code: 'TASK_NOT_RETRYABLE' });
+  await service.close();
+  const restarted = new TaskService(config, new FileStore(config.dataDir), new ControlledRunner());
+  await restarted.init(); cleanup.push(() => restarted.close());
+  expect((await restarted.retry(original.taskId, 'attempt-1')).taskId).toBe(retry.taskId);
+  expect(restarted.getTask(retry.taskId).retryOfTaskId).toBe(original.taskId);
+});
+
 it('bounds admission before slow persistence and coalesces simultaneous idempotent requests', async () => {
   const { service, store } = await fixture({ maxConcurrent: 1, maxQueued: 2 });
   const save = store.saveSession.bind(store);
