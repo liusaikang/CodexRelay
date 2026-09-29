@@ -4,6 +4,18 @@ A self-hosted Codex task gateway with MCP tools, HTTP APIs, persistent sessions,
 
 将 Codex 接入你的应用：提交问题后立即获得任务 ID，由服务负责排队、执行、会话续接和结果保存。项目说明与 Skills 由 Codex 原生加载，适合代码分析、日志诊断以及可扩展的运维工作流。
 
+[快速开始](#本地运行) · [登录与额度](docs/codex-auth.md) · [完整接入示例](docs/first-task.md) · [调度机制](docs/scheduling.md) · [运维排障](docs/troubleshooting.md)
+
+```mermaid
+flowchart LR
+  A[你的应用 / MCP 客户端] --> B[提交任务，立即返回 ID]
+  B --> C[持久化队列]
+  C --> D[并发控制 / 同会话串行]
+  D --> E[Codex SDK + 项目 Skills]
+  E --> F[结果 / 进度 / 用量]
+  F --> G[应用查询 / 运维控制台]
+```
+
 ## 能做什么
 
 - **接入简单**：`question` 必填，`context`、`sessionId`、`idempotencyKey` 可选。
@@ -30,10 +42,12 @@ npm ci
 npm run init:env
 npm run build
 npm run check:dev
+npm run codex:auth -- login
+npm run codex:auth -- status
 npm run start:dev
 ```
 
-打开 <http://127.0.0.1:8787/>，开发控制台使用 `admin/admin`。模型认证与控制台登录相互独立，需按 [部署文档](docs/deployment.md) 登录专用 Codex home。`init:env` 创建随机服务 Token 和生产控制台密码，已有 `.env` 不会被覆盖。
+在克隆下来的仓库根目录运行上述命令。打开 <http://127.0.0.1:8787/>，开发控制台使用 `admin/admin`。`codex:auth` 读取开发配置的 Codex home，不会误用终端中另一套 `CODEX_HOME`。模型认证与控制台登录相互独立，详见 [登录与额度](docs/codex-auth.md)。`init:env` 创建随机服务 Token 和生产控制台密码，已有 `.env` 不会被覆盖。
 
 开发与生产分别使用 `config/development.yaml` 和 `config/production.yaml`，启动命令为 `npm run start:dev` / `npm run start:prod`。开发数据目录保持固定；生产目录由环境变量指定。配置热更新不改变数据目录。
 
@@ -43,8 +57,8 @@ npm run start:dev
 
 ```sh
 docker compose build
-docker compose run --rm codex-mcp codex login --device-auth
-docker compose run --rm codex-mcp codex login status
+docker compose run --rm codex-mcp node dist/cli/auth.js login --config config/production.yaml
+docker compose run --rm codex-mcp node dist/cli/auth.js status --config config/production.yaml
 docker compose up -d
 ```
 
@@ -81,6 +95,23 @@ docker compose up -d
 
 [MCP 接入指南](docs/mcp.md) 提供客户端代码、stdio 设置和错误处理。
 
+## 多请求如何处理
+
+部署方主要设置 `maxConcurrent`（运行上限）和 `maxQueued`（等待容量）。HTTP 与 MCP 进入同一个队列；同会话自动串行，不需要调用方配置更多限额。
+
+例如并发设为 2，依次收到 A1、A2、B1，其中 A1/A2 属于同一个会话：A1 和 B1 可同时执行，A2 等 A1 完成后再继续。其他会话不会被 A2 挡住。
+
+| 情况 | 服务行为 |
+| --- | --- |
+| 并发已满 | 接受任务并排队；容量耗尽时明确返回 429 |
+| 网络断开后重发 | 相同参数和幂等键返回同一任务 |
+| 前序失败 | 同会话已排队的追问等待确认，其他会话继续 |
+| 排队超过期限 | 记录超时，保留任务供排查 |
+| 服务重启 | 恢复有效排队任务；运行中断的任务不自动重跑 |
+| 运维取消运行任务 | 等执行进程退出后再释放并发名额 |
+
+控制台可查看每个等待任务的原因。默认生产并发为 3、等待容量为 100；提高并发不增加账号额度。参数生效时机、恢复流程和验证边界见 [调度文档](docs/scheduling.md)。
+
 ## 扩展到自己的项目
 
 在服务工作目录中放置 `AGENTS.md` 和 `.agents/skills/<name>/SKILL.md`，按 Codex 原生方式配置上游 MCP 工具。调用方不需要传工作目录或模型参数。
@@ -108,9 +139,14 @@ CI 配置涵盖 Windows、macOS、Linux，以及容器构建检查和 Git 历史
 ## 文档与边界
 
 - [部署与登录](docs/deployment.md) · [MCP](docs/mcp.md) · [HTTP API](docs/http-api.md)
+- [账号认证与额度](docs/codex-auth.md) · [第一个任务](docs/first-task.md) · [排障手册](docs/troubleshooting.md)
 - [架构图](docs/architecture.md) · [调度与恢复](docs/scheduling.md) · [配置](docs/configuration.md)
 - [贡献指南](CONTRIBUTING.md) · [安全说明](SECURITY.md)
 
 一个数据目录只能由一个服务实例占用。取消不会撤销已发生的外部操作；重试创建新会话并保留原失败记录。调用日志保留期不负责删除任务历史与 Codex 原生线程。
 
-源码发布前仍需由维护者选择并添加项目许可证；当前 `private: true` 仅防止误发 npm，不代表已经授予开源许可。
+## 许可证与发布状态
+
+[MIT](LICENSE)。`private: true` 仅防止误发 npm；源码和 Docker 部署不受此字段影响。CodexRelay 是独立项目，不是 OpenAI 官方产品。
+
+当前作为 `0.1.0` 初版验证。已完成与待完成的检查见 [验证说明](docs/verification.md) 和 [发布检查表](docs/release-plan.md)。目标平台与容器验收结果以实际运行记录为准。

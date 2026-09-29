@@ -1,14 +1,33 @@
-# Open-source readiness checklist
+# 初版发布检查表
 
-Scope: preserve existing task fields and add optional native SDK sandboxMode, while keeping development storage and the single-instance scheduler. Package the service for other operators, document its actual behavior, and expose queue operations in the console.
+目标：使用者能在独立环境部署，完成 Codex 登录、任务提交和追问；运维能解释排队、失败和恢复。所有示例使用合成数据。
 
-- [x] Docker and environment setup: production config in image, bundled CLI login, persistent state, container smoke test. Image execution awaits Docker-enabled CI.
-- [x] Neutral README and public examples: no organization-specific paths, accounts, endpoints or operational records.
-- [x] Separate MCP connection and HTTP API guides with executable examples.
-- [x] Architecture diagram and console screenshots generated only from synthetic fixtures.
-- [x] Cross-platform CI, container validation and history-aware secret scanning.
-- [x] Queue browser, task cancellation and explicit retry with regression tests, including reload deduplication and late-response handling.
+## 已具备
 
-Retry creates a new session with the original question/context, a new task ID and a link to the original failed task. Original records and their idempotency keys remain unchanged. It does not release blocked follow-ups in the original session. Repeating the same retry request uses a dedicated idempotency key.
+- [x] MIT 许可证及包元数据，Docker 镜像包含许可证。
+- [x] README 产品介绍、架构图、控制台截图、HTTP / MCP 入口。
+- [x] Dockerfile、Compose、随机 `.env` 初始化和持久卷配置。
+- [x] 跨平台 `codex:auth` 命令，与服务使用同一个配置解析器和 Codex home。
+- [x] 独立登录/额度指南、完整任务与追问示例、运维排障手册。
+- [x] 全局并发、有界等待、同会话串行、幂等、取消、超时和显式重试。
+- [x] 队列原因可视化、会话记录、调用日志、运行配置热更新。
+- [x] Windows / macOS / Linux CI 矩阵和 Git 历史秘密扫描配置。
+- [x] CI 容器验收脚本：构建、启动、宿主端口、登录/静态资源、重建后配置保留。
 
-Verification: typecheck, unit/integration tests, browser tests at desktop/mobile sizes, release scan and container build/smoke when Docker is available. Report unavailable checks explicitly. Do not publish, push, or run real Codex tasks as part of screenshots or CI.
+这些勾选表示实现已存在，不表示所有目标环境的 CI 已通过。
+
+## 发布前的实际验收
+
+- [ ] 在当前发布提交上取得三个操作系统的 CI 通过记录。
+- [ ] 在具备 Docker 的环境完成镜像构建、Compose 启动和容器重建验收。
+- [ ] 在目标部署环境由部署者登录，完成一次真实模型分析、文件/Skill 读取及同会话追问。
+- [ ] 确认选择的 `sandboxMode` 在目标平台实际符合预期。
+- [ ] 复核截图、文档、可达 Git 历史和构建上下文中的隐私信息。
+- [ ] 按完整持久化目录演练备份恢复，并记录失败时如何回退。
+- [ ] 确认上述结果后创建版本标签和发布说明。
+
+当前实际验证记录在 [verification.md](verification.md)。本机缺少 Docker 时，不得把主机上的 smoke 结果写成容器验收通过。CI 和截图不登录私人账号、不调用真实模型。
+
+## 后续迭代
+
+优先收集初版部署与调用问题：首次部署成功率、失败原因是否可定位、队列持续积压时的内存和恢复表现。当前支持单实例；多实例共享队列和大规模历史归档需要另行设计，不属于初版承诺。

@@ -10,7 +10,9 @@
 !config/production.yaml
 !scripts/
 !scripts/container-smoke.mjs
+!scripts/deployment-smoke.mjs
 !examples/
 !examples/workspace/
 !examples/workspace/**
 !Dockerfile
+!LICENSE

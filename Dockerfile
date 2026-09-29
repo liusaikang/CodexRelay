@@ -15,9 +15,11 @@ ENV PATH=/app/node_modules/.bin:$PATH
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY package.json ./
+COPY LICENSE ./
 COPY public ./public
 COPY config ./config
 COPY scripts/container-smoke.mjs ./scripts/container-smoke.mjs
+COPY scripts/deployment-smoke.mjs ./scripts/deployment-smoke.mjs
 COPY examples/workspace ./examples/workspace
 RUN mkdir -p /data/home /data/production-service /data/production-invocation-logs /data/codex-home && chown -R node:node /data \
     && codex --version

@@ -22,7 +22,7 @@ npm run start:dev
 
 开发环境固定加载 `config/development.yaml`，继续读取 `data/native-logs-preview` 中的已有会话和 `data/invocation-logs` 中的调用日志。`npm start` 和旧的 `npm run start:env` 也启动开发环境。配置检查只做预检查，不代表模型认证、skill 发现或实际沙箱权限已经通过。
 
-`init:env` 生成随机服务令牌和生产控制台密码到 `.env`，不会覆盖已有文件。服务 Token 与模型认证不同。开发环境登录专用 home：Linux/macOS 使用 `CODEX_HOME="$PWD/data/codex-home" npx --no-install codex login --device-auth`；PowerShell 使用 `$env:CODEX_HOME = Join-Path (Get-Location) 'data/codex-home'` 后执行 `npx --no-install codex login --device-auth`。生产使用各自的 `CODEX_HOME`，也可提供 `CODEX_API_KEY`。`CODEX_MODEL` 和 `CODEX_MODEL_REASONING_EFFORT` 可留空，或作为新会话默认值。
+`init:env` 生成随机服务令牌和生产控制台密码到 `.env`，不会覆盖已有文件。服务 Token 与模型认证不同。执行 `npm run codex:auth -- login` 登录开发配置的专用 home，`npm run codex:auth -- status` 核对。生产命令追加 `--config config/production.yaml`。登录、容器持久化和额度解释见 [账号认证](codex-auth.md)。`CODEX_MODEL` 和 `CODEX_MODEL_REASONING_EFFORT` 可留空，或作为新会话默认值。
 
 需要代理时配置 `HTTPS_PROXY` / `HTTP_PROXY`，并在 `codex.envAllowlist` 中允许必要变量。`NO_PROXY` 应包含本机服务地址。不要假定 CLI 自动继承桌面应用或系统代理；Node 环境文件也不会覆盖终端已存在的同名环境变量。
 
@@ -64,8 +64,8 @@ Dockerfile、Compose 使用 `config/production.yaml`，生产配置和当前 SDK
 
 ```sh
 docker compose build
-docker compose run --rm codex-mcp codex login --device-auth
-docker compose run --rm codex-mcp codex login status
+docker compose run --rm codex-mcp node dist/cli/auth.js login --config config/production.yaml
+docker compose run --rm codex-mcp node dist/cli/auth.js status --config config/production.yaml
 docker compose run --rm codex-mcp node dist/main.js --config config/production.yaml --check
 docker compose up -d
 docker compose ps
@@ -81,6 +81,8 @@ docker compose logs --tail=100 codex-mcp
 ```sh
 docker compose run --rm codex-mcp node scripts/container-smoke.mjs
 ```
+
+CI 还从宿主机访问 Compose 发布的端口，验证登录、受保护资源和配置写入，再正常停止并重建容器，确认持久卷中的配置仍然生效。`scripts/deployment-smoke.mjs` 的 `seed` 阶段会修改并发为 2，只能用于独立验收实例；脚本要求显式设置 `CODEX_ACCEPTANCE_INSTANCE=1`。这部分不提交模型任务，不能代替真实账号、沙箱或 Skills 验收。
 
 镜像以 `node` 用户运行；Linux bind mount 应保证 UID 1000 有所需读写权限。文件变更能力还受挂载、宿主 ACL 和所选 Codex 沙箱约束。`.env` 中 `CODEX_SANDBOX_MODE` 支持 `read-only`、`workspace-write`、`danger-full-access`（兼容默认值），修改后重建容器使环境变量生效。只读业务可额外将工作目录挂载设为 `read_only: true`，但 `/data` 仍需写入运行状态。默认不挂载 Docker socket，不内置 SSH 私钥。沙箱模式与远端权限边界见 [配置说明](configuration.md#执行权限)。
 

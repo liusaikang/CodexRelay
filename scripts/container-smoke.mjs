@@ -9,6 +9,7 @@ import { loadConfig } from '../dist/config.js';
 import { FileStore } from '../dist/storage.js';
 import { TaskService } from '../dist/service.js';
 import { createHttpApp } from '../dist/api/http.js';
+import { verifyDeployment } from './deployment-smoke.mjs';
 
 const directory = await mkdtemp(join(tmpdir(),'relay-container-check-'));
 const token = randomBytes(32).toString('hex'), password = randomBytes(24).toString('hex');
@@ -43,10 +44,14 @@ try {
   }
   const initial = service.getSettings();
   await service.updateSettings({revision:initial.revision,settings:{...initial.settings,maxConcurrent:2}},'smoke');
+  await verifyDeployment({base,token,username:'operator',password,phase:'seed'});
   await close();
   service = new TaskService(await loadConfig('config/production.yaml'),new FileStore(config.dataDir),forbiddenRunner);
   await service.init();
   assert.equal(service.info().maxConcurrent,2);
   await access(join(config.dataDir,'runtime-settings.json'));
+  server = createHttpApp(service,token).listen(0,'127.0.0.1');
+  await new Promise(resolve => server.once('listening',resolve));
+  await verifyDeployment({base:`http://127.0.0.1:${server.address().port}`,token,username:'operator',password,phase:'restored'});
   console.log('Production config, bundled CLI, HTTP login/assets, queue and persisted settings passed. No model calls.');
 } finally { await close(); await rm(directory,{recursive:true,force:true}); }

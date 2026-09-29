@@ -37,6 +37,18 @@ jobs:
       - run: docker compose build
       - run: docker compose run --rm codex-mcp node scripts/container-smoke.mjs
       - run: docker compose up -d --wait --wait-timeout 60
+      - name: Verify published HTTP port and seed persistent settings
+        run: node --env-file=.env scripts/deployment-smoke.mjs seed
+        env:
+          CODEX_ACCEPTANCE_INSTANCE: '1'
+      - name: Recreate containers while retaining the state volume
+        run: |
+          docker compose down
+          docker compose up -d --wait --wait-timeout 60
+      - name: Verify settings survived container recreation
+        run: node --env-file=.env scripts/deployment-smoke.mjs restored
+        env:
+          CODEX_ACCEPTANCE_INSTANCE: '1'
       - if: always()
         run: docker compose down
   secrets:

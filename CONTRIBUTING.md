@@ -1,6 +1,6 @@
 # 开发与扩展
 
-CodexMCP 是面向可信业务后端的原生 Codex SDK 任务网关。网关负责认证、调度、会话和持久化，Codex 负责原生项目上下文与工具使用；不要在核心执行器中加入企业业务规则或自建 skill 路由。
+CodexRelay 是面向可信业务后端的原生 Codex SDK 任务网关。网关负责认证、调度、会话和持久化，Codex 负责原生项目上下文与工具使用；不要在核心执行器中加入企业业务规则或自建 skill 路由。
 
 ## 接入新场景
 
@@ -40,7 +40,7 @@ npm run release:check
 
 客户端使用可选 `--context`，保留 `--inline-example`；上下文直传成功不代表 Codex 自动读取文件或使用 skill 成功。新增验证记录到 [verification.md](docs/verification.md)，注明执行环境、命令、证据来源及未覆盖项，不重复沿用旧方案的通过次数。
 
-测试覆盖 SDK 替身、HTTP、MCP、stdio、四字段提交契约和旧记录兼容。每次修改后重新执行检查；当前结果统一维护在 [验证说明](docs/verification.md)。容器检查脚本不调用真实模型，不能代替目标部署环境的真实认证与执行验证。
+测试覆盖 SDK 替身、HTTP、MCP、stdio、请求参数与权限枚举、登录目录隔离和旧记录兼容。每次修改后重新执行检查；当前结果统一维护在 [验证说明](docs/verification.md)。容器检查脚本不调用真实模型，不能代替目标部署环境的真实认证与执行验证。
 
 公开截图通过 `npm run docs:screenshots` 生成，使用受控合成数据，不连接真实服务。浏览器脚本默认使用 Chromium；本机可设置 `BROWSER_CHANNEL=msedge`。图像直接提交到 `docs/images`，不走 Git LFS。
 
@@ -48,4 +48,4 @@ npm run release:check
 
 检查文档示例、原生配置和 skills 中的敏感数据；不要提交 `.env`、认证资料或业务日志。发布前检查不保证检出所有秘密，仍需人工审查。
 
-发布源码前由项目所有者选择并添加 LICENSE；`private: true` 用于防止误发 npm，依赖许可证不等于本项目许可证。
+本项目使用 [MIT 许可证](LICENSE)。`private: true` 用于防止误发 npm；添加依赖时仍应检查其许可证与分发要求。发布前按 [检查表](docs/release-plan.md) 记录实际验收结果。

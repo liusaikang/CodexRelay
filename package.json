@@ -2,7 +2,8 @@
   "name": "codex-task-mcp",
   "version": "0.1.0",
   "private": true,
-  "description": "Configurable full-access Codex task service with durable sessions and bounded concurrency",
+  "license": "MIT",
+  "description": "Self-hosted Codex task gateway with MCP, HTTP, durable sessions and bounded concurrency",
   "type": "module",
   "engines": {
     "node": ">=22.12.0"
@@ -11,6 +12,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "npm run start:dev",
     "init:env": "node scripts/init-env.mjs",
+    "codex:auth": "node --env-file=.env dist/cli/auth.js",
     "start:dev": "node --env-file=.env dist/main.js --config config/development.yaml",
     "start:prod": "node --env-file=.env dist/main.js --config config/production.yaml",
     "start:env": "npm run start:dev",

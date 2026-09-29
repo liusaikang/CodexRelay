@@ -124,6 +124,8 @@ try {
   await submit.click();
   await expect(page.locator('#task-message')).toHaveText('请先填写问题内容。');
   assert.equal(submissions.length, 0);
+  await expect(page.getByLabel('执行权限')).toHaveValue('danger-full-access');
+  await page.getByLabel('执行权限').selectOption('read-only');
   await page.getByLabel('问题内容').fill('分析这个测试问题');
   await page.getByLabel('附加上下文 JSON').fill('{"source":"browser-smoke"}');
   await submit.click();
@@ -132,6 +134,7 @@ try {
   assert.equal(submissions.length, 1);
   assert.equal(submissions[0].question, '分析这个测试问题');
   assert.deepEqual(submissions[0].context, { source: 'browser-smoke' });
+  assert.equal(submissions[0].sandboxMode, 'read-only');
   await checkLayout(page);
   await page.getByRole('button', { name: '调用日志', exact: true }).click();
   await expect(page.locator('#logs-total')).toHaveText('21');
