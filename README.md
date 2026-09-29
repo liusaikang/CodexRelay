@@ -117,6 +117,10 @@ your-workspace/
 
 部署设置、模型与推理强度见 [配置说明](docs/configuration.md)。示例目录 `examples/workspace` 只包含合成证据。
 
+默认工作目录中保留两个公开 Skill：`log-evidence` 演示日志分析，`acceptance-ledger-check` 用于验证 Skill 加载和源码关联。自定义 Skill 请新建在 `examples/workspace/.agents/skills/<你的技能名>/SKILL.md`；更换工作目录后，放到新工作目录的 `.agents/skills/` 下。目录名是 `.agents`，不是 `.agent`。
+
+本仓库的 `.gitignore` 默认忽略其他 `.agents/skills/` 和 `.codex/skills/` 文件，只放行上述公开示例的指定文件。请不要将私人配置写进这些已公开的示例文件；已跟踪文件的修改不会被 `.gitignore` 隐藏。外部项目需自行设置 Git 忽略规则。
+
 ## 开发与验证
 
 ```sh

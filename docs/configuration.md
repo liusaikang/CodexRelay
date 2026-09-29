@@ -103,6 +103,10 @@ CODEX_SANDBOX_MODE=read-only
 
 原生示例位于 `examples/workspace/.agents/skills/log-evidence/SKILL.md`，项目说明位于 `examples/workspace/AGENTS.md`。接入新工作目录时，在该目录内维护 `AGENTS.md` 与 `.agents/skills/<名称>/SKILL.md`。
 
+`examples/workspace/.agents/skills/acceptance-ledger-check/` 是使用合成账号、日志和源码的验收示例，使用方法及真实验收结果见 [HTTP 验收](http-acceptance.md)。这两个公开示例的指定文件在 `.gitignore` 中逐个放行，其他 `.agents/skills/`、`.codex/skills/` 内容默认忽略，包括示例目录中新加的文件。
+
+本地开发请为自己的 Skill 新建独立目录，不要将私人配置写入已跟踪的公开示例文件。Git 忽略规则不影响 Codex 从磁盘加载 Skill，也不能隐藏已经跟踪的文件或清除历史提交；使用仓库外的工作目录时，需在那个项目中另外配置忽略规则。
+
 最小 skill 文件示意：
 
 ```markdown

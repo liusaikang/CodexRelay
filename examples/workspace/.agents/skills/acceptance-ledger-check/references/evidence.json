@@ -1,0 +1,22 @@
+{
+  "synthetic": true,
+  "reportMarker": "LEDGER-PROOF-7E93C1",
+  "records": [
+    {
+      "account": "ledger-demo-reader",
+      "requestId": "ledger-request-a17",
+      "membership": { "enabled": false },
+      "ledgerCount": 3,
+      "returnedCount": 0,
+      "log": "membership check rejected; reason=MEMBERSHIP_INACTIVE"
+    },
+    {
+      "account": "ledger-demo-active",
+      "requestId": "ledger-request-b28",
+      "membership": { "enabled": true },
+      "ledgerCount": 3,
+      "returnedCount": 3,
+      "log": "membership check accepted"
+    }
+  ]
+}

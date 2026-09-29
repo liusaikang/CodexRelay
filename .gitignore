@@ -9,3 +9,14 @@ config/local.yaml
 coverage/
 *.log
 !examples/workspace/application.log
+
+# Keep private skills local. Only the public example files below are shared.
+**/.agents/skills/**
+**/.codex/skills/**
+!examples/workspace/.agents/skills/log-evidence/
+!examples/workspace/.agents/skills/log-evidence/SKILL.md
+!examples/workspace/.agents/skills/acceptance-ledger-check/
+!examples/workspace/.agents/skills/acceptance-ledger-check/SKILL.md
+!examples/workspace/.agents/skills/acceptance-ledger-check/references/
+!examples/workspace/.agents/skills/acceptance-ledger-check/references/evidence.json
+!examples/workspace/.agents/skills/acceptance-ledger-check/references/visibility.mjs
