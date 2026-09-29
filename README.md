@@ -6,15 +6,7 @@ A self-hosted Codex task gateway with MCP tools, HTTP APIs, persistent sessions,
 
 [快速开始](#本地运行) · [登录与额度](docs/codex-auth.md) · [完整接入示例](docs/first-task.md) · [调度机制](docs/scheduling.md) · [运维排障](docs/troubleshooting.md)
 
-```mermaid
-flowchart LR
-  A[你的应用 / MCP 客户端] --> B[提交任务，立即返回 ID]
-  B --> C[持久化队列]
-  C --> D[并发控制 / 同会话串行]
-  D --> E[Codex SDK + 项目 Skills]
-  E --> F[结果 / 进度 / 用量]
-  F --> G[应用查询 / 运维控制台]
-```
+![CodexRelay 产品概览：通过 MCP / HTTP 提交任务，经并发调度与 Codex SDK 执行后获取结果，由统一控制台管理账号额度、任务会话和运行日志。](docs/images/codexrelay-overview.png)
 
 ## 能做什么
 
