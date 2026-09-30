@@ -9,7 +9,7 @@ import { ProcessRunner } from './runner/process.js';
 import { DemoRunner } from './runner/demo.js';
 import { createHttpApp } from './api/http.js';
 import { createMcpServer } from './api/mcp.js';
-import { AccountInspector, CodexAppServerGateway } from './account.js';
+import { AccountInspector, CodexAppServerGateway, CodexLoginManager } from './account.js';
 
 const { values } = parseArgs({ options: {
   config: { type: 'string', default: 'config/development.yaml' },
@@ -41,6 +41,7 @@ async function main() {
   const service = new TaskService(config, new FileStore(config.dataDir), config.runner === 'codex' ? new ProcessRunner() : new DemoRunner());
   const accountGateway = config.runner === 'codex' ? new CodexAppServerGateway({ codexHome: config.codexHome, codexPath: config.codexPath }) : undefined;
   const accountStatus = accountGateway ? new AccountInspector(accountGateway) : undefined;
+  const codexLogin = accountGateway ? new CodexLoginManager(accountGateway, accountStatus) : undefined;
   await service.init();
   let closeTransport: () => Promise<void> = async () => {};
   let stopping = false;
@@ -49,6 +50,7 @@ async function main() {
     stopping = true;
     // Stop admission before closing listeners; retain queued tasks for next startup.
     await service.close();
+    codexLogin?.close();
     await accountGateway?.close();
     await closeTransport();
   };
@@ -59,7 +61,7 @@ async function main() {
       closeTransport = () => server.close();
       process.stdin.once('end', () => { void shutdown(); });
     } else {
-      const app = createHttpApp(service, token, accountStatus);
+      const app = createHttpApp(service, token, accountStatus, codexLogin);
       const server = app.listen(config.port, config.host);
       await new Promise<void>((resolve, reject) => { server.once('listening', resolve); server.once('error', reject); });
       closeTransport = () => new Promise<void>((resolve, reject) => {

@@ -22,6 +22,9 @@ services:
       CODEX_MODEL: ${CODEX_MODEL:-}
       CODEX_MODEL_REASONING_EFFORT: ${CODEX_MODEL_REASONING_EFFORT:-}
       CODEX_SANDBOX_MODE: ${CODEX_SANDBOX_MODE:-danger-full-access}
+      HTTPS_PROXY: ${HTTPS_PROXY:-}
+      HTTP_PROXY: ${HTTP_PROXY:-}
+      NO_PROXY: ${NO_PROXY:-127.0.0.1,localhost,::1}
     volumes:
       - codex-state:/data
       - type: bind

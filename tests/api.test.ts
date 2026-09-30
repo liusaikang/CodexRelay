@@ -10,7 +10,7 @@ import { TaskService } from '../src/service.js';
 import { FileStore } from '../src/storage.js';
 import { DemoRunner } from '../src/runner/demo.js';
 import { createHttpApp } from '../src/api/http.js';
-import type { AccountStatusProvider } from '../src/account.js';
+import type { AccountStatusProvider, CodexLoginProvider } from '../src/account.js';
 
 let dir: string;
 let service: TaskService;
@@ -27,6 +27,11 @@ const accountStatus: AccountStatusProvider = {
     tokenUsage: { lifetimeTokens: 1000, peakDailyTokens: 500, longestRunningTurnSec: 20, currentStreakDays: 2, longestStreakDays: 3, daily: [] },
   }),
 };
+const codexLogin: CodexLoginProvider = {
+  status: () => ({ status: 'idle' }),
+  start: async () => ({ status: 'pending', verificationUrl: 'https://auth.openai.com/codex/device', userCode: 'ABCD-EFGH' }),
+  cancel: async () => ({ status: 'idle' }),
+};
 beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), 'codex-api-'));
   const config = await loadConfig(resolve('config/demo.yaml'));
@@ -34,7 +39,7 @@ beforeEach(async () => {
   config.invocationLog = { enabled: true, directory: join(dir, 'logs'), retentionDays: 30 };
   service = new TaskService(config, new FileStore(config.dataDir), new DemoRunner());
   await service.init();
-  server = createHttpApp(service, token, accountStatus).listen(0, '127.0.0.1');
+  server = createHttpApp(service, token, accountStatus, codexLogin).listen(0, '127.0.0.1');
   await new Promise<void>(r => server.once('listening', r));
   base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
 });
@@ -47,6 +52,22 @@ it('serves protected account status and supports a forced refresh', async () => 
   });
   const refreshed = await (await fetch(`${base}/v1/admin/account/refresh`, { method: 'POST', headers, body: '{}' })).json();
   expect(refreshed.quota.primary.remainingPercent).toBe(59);
+});
+
+it('allows Codex login only from an authenticated same-origin console session', async () => {
+  const path = `${base}/console/codex-login`;
+  expect((await fetch(path)).status).toBe(401);
+  expect((await fetch(`${path}/start`, { method: 'POST', headers })).status).toBe(403);
+  const login = await fetch(`${base}/console/login`, {
+    method: 'POST', headers: { Origin: base, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: 'admin', password: 'admin' }),
+  });
+  const cookie = login.headers.get('set-cookie')!.split(';')[0]!;
+  expect((await fetch(path, { headers: { Cookie: cookie } })).status).toBe(200);
+  expect((await fetch(`${path}/start`, { method: 'POST', headers: { Cookie: cookie } })).status).toBe(403);
+  const browserHeaders = { Cookie: cookie, Origin: base };
+  expect(await (await fetch(`${path}/start`, { method: 'POST', headers: browserHeaders })).json()).toMatchObject({ status: 'pending', userCode: 'ABCD-EFGH' });
+  expect(await (await fetch(`${path}/cancel`, { method: 'POST', headers: browserHeaders })).json()).toMatchObject({ status: 'idle' });
 });
 
 it('accepts native sandbox modes over HTTP and MCP and rejects unknown values', async () => {

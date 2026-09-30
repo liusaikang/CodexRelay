@@ -19,6 +19,7 @@
     .account-panel{background:white;border:1px solid var(--line);border-radius:8px;padding:26px}.identity{display:grid;grid-template-columns:auto minmax(0,1fr);gap:16px;align-items:center;padding-bottom:24px;border-bottom:1px solid var(--line)}.avatar{width:50px;height:50px;border-radius:7px;border:1px solid #b9d9cc;background:var(--soft);color:var(--green);display:grid;place-items:center}.avatar svg{width:24px;height:24px}.account{font-size:17px;font-weight:650;overflow-wrap:anywhere}.account-meta{margin-top:2px;color:var(--muted);font-size:12px}.plan{display:inline-flex;margin-left:7px;padding:1px 7px;border-radius:4px;background:#e7eefc;color:#345d9d;font-size:11px;text-transform:uppercase;vertical-align:2px}
     .quota{padding-top:25px}.quota-title{display:flex;justify-content:space-between;align-items:baseline;gap:14px}.quota-title span{font-weight:600}.quota-title strong{font-size:24px;color:var(--green);font-weight:650}.track{height:12px;margin-top:12px;background:#e7ece9;border-radius:4px;overflow:hidden}.bar{height:100%;width:0;background:var(--green);transition:width .3s ease}.quota-details{display:flex;justify-content:space-between;gap:15px;margin-top:9px;font-size:12px;color:var(--muted)}.facts{display:grid;grid-template-columns:1fr 1fr;margin-top:25px;border:1px solid var(--line);border-radius:6px;overflow:hidden}.fact{padding:15px 17px;background:var(--surface)}.fact+.fact{border-left:1px solid var(--line)}.fact-label{font-size:11px;color:var(--muted)}.fact-value{margin-top:3px;font-size:14px;font-weight:600}.secondary{margin-top:20px;padding-top:20px;border-top:1px solid var(--line)}.secondary .quota-title strong{font-size:17px}.secondary .track{height:8px}
     .message{margin:14px 32px 0;padding:11px 14px;border:1px solid #efd0cc;border-radius:6px;background:#fff2f1;color:var(--red);font-size:12px;overflow-wrap:anywhere}.account-shell .message{margin:14px 0 0}
+    .account-actions{display:flex;gap:8px;flex-wrap:wrap}.login-flow{padding:18px 0;border-bottom:1px solid var(--line)}.login-flow h3{font-size:14px;margin:0 0 4px}.login-flow p{font-size:12px;color:var(--muted);margin:0 0 12px}.login-code{display:inline-block;padding:7px 11px;border:1px solid var(--line);border-radius:5px;background:var(--surface);font:600 18px/1.4 Consolas,monospace}.login-flow-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.login-flow-actions a{display:inline-flex;align-items:center;gap:6px;min-height:38px;padding:7px 12px;border:1px solid var(--line);border-radius:6px;color:var(--green);text-decoration:none}.login-flow-actions a:hover{border-color:#9eb6ab;background:#fbfcfb}.login-flow-actions svg{width:16px;height:16px}.login-feedback{margin:12px 0 0;color:var(--muted);font-size:12px}.login-feedback.error{color:var(--red)}
     .connection-strip{max-width:1560px;margin:0 auto;padding:18px 24px;border-bottom:1px solid var(--line);background:white;display:grid;grid-template-columns:minmax(190px,.75fr) minmax(280px,1.25fr) auto;gap:16px;align-items:end}.connection-strip .field{margin:0}.connection-strip input{background:var(--surface);color:#52615a}.connection-strip button{height:40px}
     .task-shell{max-width:1560px;margin:0 auto;background:white;display:grid;grid-template-columns:370px minmax(0,1fr)}.task-sidebar{border-right:1px solid var(--line);min-width:0}.compose,.history{padding:25px 24px}.history{border-top:1px solid var(--line)}.section-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:17px}.section-heading h2{font-size:16px;margin:0}.eyebrow{font-size:11px;color:var(--muted)}.field{margin-bottom:17px}.optional,.field-help{font-weight:400;color:var(--muted)}.field-help{font-size:11px;margin-top:6px}.session-line{display:flex;gap:8px}.submit{width:100%;height:42px}
     .history-list{list-style:none;margin:0;padding:0}.history-list li{border-bottom:1px solid #edf0ee}.history-list button{width:100%;border:0;border-radius:0;padding:10px 0;text-align:left;justify-content:flex-start;background:transparent;white-space:normal}.history-title{font-size:12px;overflow-wrap:anywhere}.history-time{display:block;font-size:10px;color:var(--muted)}
@@ -52,9 +53,11 @@
 
   <section id="account-view" class="view">
     <main class="account-shell">
-      <div class="page-heading"><div><h2>当前 Codex 账号</h2><p>查看服务使用的登录账号和实时剩余额度。</p></div><button type="button" id="refresh-account" disabled><i data-lucide="refresh-cw"></i>刷新</button></div>
+      <div class="page-heading"><div><h2>当前 Codex 账号</h2><p>查看服务使用的登录账号和实时剩余额度。</p></div><div class="account-actions"><button type="button" id="start-codex-login" class="primary hidden"><i data-lucide="log-in"></i>登录 Codex</button><button type="button" id="refresh-account" disabled><i data-lucide="refresh-cw"></i>刷新</button></div></div>
       <section class="account-panel">
         <div class="identity"><div class="avatar"><i data-lucide="user-round"></i></div><div><div class="account"><span id="account">读取中…</span><span id="plan" class="plan hidden"></span></div><div id="login-method" class="account-meta">正在检查 Codex 登录状态</div></div></div>
+        <div id="codex-login-flow" class="login-flow hidden"><h3>完成设备授权</h3><p>在打开的官方页面登录，并输入以下一次性验证码。</p><strong id="codex-login-code" class="login-code"></strong><div class="login-flow-actions"><a id="codex-login-link" target="_blank" rel="noopener noreferrer"><i data-lucide="external-link"></i>打开登录页面</a><button type="button" id="copy-codex-code" title="复制验证码"><i data-lucide="copy"></i>复制验证码</button><button type="button" id="cancel-codex-login">取消</button></div></div>
+        <p id="codex-login-feedback" class="login-feedback hidden" role="status" aria-live="polite"></p>
         <div class="quota"><div class="quota-title"><span>主要额度窗口</span><strong id="remaining">—</strong></div><div class="track" role="progressbar" aria-label="主要额度剩余" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="remaining-bar" class="bar"></div></div><div class="quota-details"><span id="used">已使用 —</span><span id="reset">重置时间 —</span></div></div>
         <div id="secondary" class="secondary hidden"><div class="quota-title"><span>次要额度窗口</span><strong id="secondary-remaining">—</strong></div><div class="track" role="progressbar" aria-label="次要额度剩余" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="secondary-bar" class="bar"></div></div><div class="quota-details"><span id="secondary-used">已使用 —</span><span id="secondary-reset">重置时间 —</span></div></div>
         <div class="facts"><div class="fact"><div class="fact-label">可用重置次数</div><div id="reset-credits" class="fact-value">—</div></div><div class="fact"><div class="fact-label">最近检查</div><div id="checked-at" class="fact-value">—</div></div></div>
@@ -166,6 +169,7 @@
     const $ = id => document.getElementById(id);
     window.lucide?.createIcons();
     let serviceInfo = null, submitting = false, taskReady = false;
+    let codexRunner = false, accountAuthenticated = false, loginState = {status:'idle'}, loginTimer;
     let selectedSession = '', viewEpoch = 0, historyOffset = 0, totalTurns = 0, refreshEpoch = null, monitorTimer;
     let sessionsOffset = 0, sessionsTotal = 0, sessionListEpoch = 0;
     const turnRows = new Map();
@@ -245,6 +249,7 @@
       const body = await response.json();
       if (response.status === 401) { location.assign('/login'); throw new Error('请先登录控制台'); }
       if (!response.ok || typeof body.username !== 'string') throw new Error('无法确认控制台登录状态');
+      codexRunner = body.runner === 'codex';
       serviceStatus('已连接','online');
     }
     function setQuota(prefix, quota) {
@@ -257,12 +262,59 @@
     }
     function renderAccount(account) {
       const authenticated = account?.available && account?.authenticated;
+      accountAuthenticated = !!authenticated;
       $('account').textContent = authenticated ? account.email || 'ChatGPT 账号' : account?.available ? '未登录 Codex' : '账号状态暂不可用';
       $('plan').textContent = authenticated && account.plan ? account.plan : ''; $('plan').classList.toggle('hidden',!authenticated || !account.plan);
       $('login-method').textContent = authenticated ? (account.method === 'chatgpt' ? '通过 ChatGPT 账号登录' : '登录方式：' + account.method) : account?.available ? '请在服务端完成 Codex 登录' : '无法从 Codex App Server 读取账号';
       setQuota('',account?.quota?.primary); const secondary = account?.quota?.secondary; $('secondary').classList.toggle('hidden',!secondary); if (secondary) setQuota('secondary-',secondary);
       $('reset-credits').textContent = typeof account?.credits?.availableResetCount === 'number' ? account.credits.availableResetCount + ' 次' : '—'; $('checked-at').textContent = formatTime(account?.checkedAt);
+      $('start-codex-login').classList.toggle('hidden',!codexRunner || authenticated || ['starting','pending'].includes(loginState.status));
       message('account-message',account?.error ? '暂时无法读取 Codex 账号状态，请确认服务端已安装并登录 Codex。' : '');
+    }
+    function renderLogin(state) {
+      const previous = loginState.status;
+      loginState = state;
+      clearTimeout(loginTimer);
+      const pending = state.status === 'pending';
+      $('codex-login-flow').classList.toggle('hidden',!pending);
+      $('start-codex-login').classList.toggle('hidden',!codexRunner || accountAuthenticated || pending || state.status === 'starting');
+      if (pending) {
+        $('codex-login-code').textContent = state.userCode || '';
+        $('codex-login-link').href = state.verificationUrl;
+      } else $('codex-login-link').removeAttribute('href');
+      const feedback = $('codex-login-feedback');
+      feedback.textContent = pending ? '等待浏览器完成授权…' : state.status === 'starting' ? '正在请求设备验证码…' :
+        state.status === 'succeeded' ? '登录成功，正在刷新账号额度。' : state.status === 'failed' ? (state.message || '登录未完成，请重试。') : '';
+      feedback.classList.toggle('hidden',!feedback.textContent);
+      feedback.classList.toggle('error',state.status === 'failed');
+      if (pending) loginTimer = setTimeout(() => { void loadLoginState(); },3000);
+      if (state.status === 'succeeded' && previous !== 'succeeded') void loadAccount(true);
+    }
+    async function loadLoginState() {
+      if (!codexRunner) return;
+      try { renderLogin(await api('/console/codex-login')); }
+      catch (error) {
+        clearTimeout(loginTimer);
+        $('codex-login-feedback').textContent = error.message || '无法读取登录状态';
+        $('codex-login-feedback').classList.remove('hidden');
+        $('codex-login-feedback').classList.add('error');
+      }
+    }
+    async function startCodexLogin() {
+      if (!codexRunner || ['starting','pending'].includes(loginState.status)) return;
+      const loginWindow = window.open('about:blank','_blank');
+      renderLogin({status:'starting'});
+      try {
+        const state = await api('/console/codex-login/start',{method:'POST'});
+        renderLogin(state);
+        if (loginWindow && state.status === 'pending') {
+          loginWindow.opener = null;
+          loginWindow.location.replace(state.verificationUrl);
+        } else loginWindow?.close();
+      } catch (error) {
+        loginWindow?.close();
+        renderLogin({status:'failed',message:error.message || '无法发起 Codex 登录'});
+      }
     }
     async function loadAccount(force = false) {
       $('refresh-account').disabled = true; message('account-message');
@@ -576,7 +628,16 @@
       try { const item = await api('/v1/tasks/' + encodeURIComponent(id)); if (epoch === viewEpoch) await selectSession(item.sessionId,item.taskId,item); }
       catch (error) { if (epoch === viewEpoch) message('task-message',error.status === 404 ? '当前实例未找到此任务。不能据此判断请求未到达，请核对服务地址、任务 ID、鉴权和调用方记录。' : '任务读取失败：' + error.message); }
     };
-    $('refresh-account').onclick = () => { void loadAccount(true); };
+    $('refresh-account').onclick = () => { void loadAccount(true); void loadLoginState(); };
+    $('start-codex-login').onclick = () => { void startCodexLogin(); };
+    $('copy-codex-code').onclick = async () => {
+      try { await navigator.clipboard.writeText(loginState.userCode || ''); $('codex-login-feedback').textContent = '验证码已复制，等待浏览器完成授权。'; }
+      catch { $('codex-login-feedback').textContent = '复制失败，请手动选择验证码。'; }
+    };
+    $('cancel-codex-login').onclick = async () => {
+      try { renderLogin(await api('/console/codex-login/cancel',{method:'POST'})); }
+      catch (error) { renderLogin({status:'failed',message:error.message || '取消登录失败'}); }
+    };
     $('reconnect').onclick = () => { void reconnectTaskConsole(); };
     $('logout').onclick = async () => {
       $('logout').disabled = true;
@@ -586,7 +647,7 @@
     for (const button of document.querySelectorAll('.quick-nav button')) button.onclick = () => showView(button.dataset.view);
     $('endpoint').value = location.origin;
     if (location.protocol === 'file:') { serviceStatus('打开方式错误','error'); message('account-message','请通过 CodexRelay 服务地址打开此页面。'); }
-    else void (async () => { try { await bootstrap(); await loadAccount(); } catch (error) { serviceStatus('连接失败','error'); renderAccount({available:false,authenticated:false}); message('account-message',error.message || String(error)); } })();
+    else void (async () => { try { await bootstrap(); await Promise.all([loadAccount(),loadLoginState()]); } catch (error) { serviceStatus('连接失败','error'); renderAccount({available:false,authenticated:false}); message('account-message',error.message || String(error)); } })();
     syncTaskControls();
   </script>
 </body>

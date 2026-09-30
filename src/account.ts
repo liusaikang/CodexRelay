@@ -2,6 +2,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { createInterface } from 'node:readline';
+import { AppError } from './types.js';
 
 type QuotaWindow = { usedPercent: number; remainingPercent: number; windowDurationMins: number | null; resetsAt: string | null };
 export type AccountSnapshot = {
@@ -22,6 +23,21 @@ export type AccountSnapshot = {
 
 export interface AccountStatusProvider { read(force?: boolean): Promise<AccountSnapshot> }
 export interface AccountGateway { request(method: string, params?: unknown): Promise<unknown> }
+export interface AccountLoginGateway extends AccountGateway {
+  subscribe(listener: (method: string, params: unknown) => void): () => void;
+}
+export type CodexLoginSnapshot = {
+  status: 'idle' | 'starting' | 'pending' | 'succeeded' | 'failed';
+  verificationUrl?: string;
+  userCode?: string;
+  startedAt?: string;
+  message?: string;
+};
+export interface CodexLoginProvider {
+  status(): CodexLoginSnapshot;
+  start(): Promise<CodexLoginSnapshot>;
+  cancel(): Promise<CodexLoginSnapshot>;
+}
 
 const record = (value: unknown): Record<string, any> => value && typeof value === 'object' ? value as Record<string, any> : {};
 const finiteNumber = (value: unknown): number | null => typeof value === 'number' && Number.isFinite(value) ? value : null;
@@ -50,6 +66,8 @@ export class AccountInspector implements AccountStatusProvider {
   private pending?: Promise<AccountSnapshot>;
   constructor(private gateway: AccountGateway, private cacheMs = 30_000) {}
 
+  invalidate() { this.cached = undefined; }
+
   async read(force = false): Promise<AccountSnapshot> {
     if (!force && this.cached && this.cached.expiresAt > Date.now()) return structuredClone(this.cached.value);
     if (!force && this.pending) return this.pending;
@@ -67,14 +85,15 @@ export class AccountInspector implements AccountStatusProvider {
   private async inspect(): Promise<AccountSnapshot> {
     const checkedAt = new Date().toISOString();
     try {
-      const [accountRaw, limitsRaw, usageRaw] = await Promise.all([
-        this.gateway.request('account/read', { refreshToken: false }),
-        this.gateway.request('account/rateLimits/read', { excludeResetCreditDetails: false }),
-        this.gateway.request('account/usage/read', {}),
-      ]);
+      const accountRaw = await this.gateway.request('account/read', { refreshToken: false });
       const accountResponse = record(accountRaw);
       const account = record(accountResponse.account);
       const authenticated = !!accountResponse.account;
+      if (!authenticated) return { available: true, authenticated: false, checkedAt };
+      const [limitsRaw, usageRaw] = await Promise.all([
+        this.gateway.request('account/rateLimits/read', { excludeResetCreditDetails: false }),
+        this.gateway.request('account/usage/read', {}),
+      ]);
       const limits = record(limitsRaw);
       const byId = record(limits.rateLimitsByLimitId);
       const rate = record(byId.codex ?? limits.rateLimits);
@@ -112,15 +131,95 @@ export class AccountInspector implements AccountStatusProvider {
   }
 }
 
+export class CodexLoginManager implements CodexLoginProvider {
+  private current: CodexLoginSnapshot = { status: 'idle' };
+  private loginId?: string;
+  private starting?: Promise<CodexLoginSnapshot>;
+  private unsubscribe: () => void;
+
+  constructor(private gateway: AccountLoginGateway, private accountStatus?: AccountInspector) {
+    this.unsubscribe = gateway.subscribe((method, params) => this.onNotification(method, params));
+  }
+
+  status(): CodexLoginSnapshot {
+    if (this.current.status === 'pending' && this.current.startedAt && Date.now() - Date.parse(this.current.startedAt) > 15 * 60_000) {
+      const id = this.loginId;
+      this.loginId = undefined;
+      this.current = { status: 'failed', message: '登录等待已过期，请重新发起。' };
+      if (id) void this.gateway.request('account/login/cancel', { loginId: id }).catch(() => {});
+    }
+    return { ...this.current };
+  }
+
+  async start(): Promise<CodexLoginSnapshot> {
+    if (this.current.status === 'pending') return this.status();
+    if (this.starting) return this.starting;
+    this.current = { status: 'starting' };
+    const pending = this.begin();
+    this.starting = pending;
+    try { return await pending; }
+    finally { if (this.starting === pending) this.starting = undefined; }
+  }
+
+  private async begin(): Promise<CodexLoginSnapshot> {
+    try {
+      const response = record(await this.gateway.request('account/login/start', { type: 'chatgptDeviceCode' }));
+      const url = new URL(String(response.verificationUrl ?? ''));
+      if (response.type !== 'chatgptDeviceCode' || typeof response.loginId !== 'string' ||
+          typeof response.userCode !== 'string' || url.protocol !== 'https:' ||
+          !['auth.openai.com', 'chatgpt.com'].includes(url.hostname)) throw new Error('Unexpected device login response');
+      this.loginId = response.loginId;
+      this.current = { status: 'pending', verificationUrl: url.href, userCode: response.userCode, startedAt: new Date().toISOString() };
+      return this.status();
+    } catch {
+      const message = '无法从服务端发起 Codex 登录，请检查授权服务的网络连接、代理和设备码登录权限。';
+      this.current = { status: 'failed', message };
+      throw new AppError('CODEX_LOGIN_UNAVAILABLE', message, 503);
+    }
+  }
+
+  async cancel(): Promise<CodexLoginSnapshot> {
+    const id = this.loginId;
+    this.loginId = undefined;
+    this.current = { status: 'idle' };
+    if (id) await this.gateway.request('account/login/cancel', { loginId: id }).catch(() => {});
+    return this.status();
+  }
+
+  close() { this.unsubscribe(); }
+
+  private onNotification(method: string, params: unknown) {
+    if (method === 'transport/closed' && this.current.status === 'pending') {
+      this.loginId = undefined;
+      this.current = { status: 'failed', message: 'Codex 登录服务已断开，请重新发起。' };
+      return;
+    }
+    if (method !== 'account/login/completed' || this.current.status !== 'pending') return;
+    const event = record(params);
+    if (event.loginId !== this.loginId) return;
+    this.loginId = undefined;
+    if (event.success === true) {
+      this.accountStatus?.invalidate();
+      this.current = { status: 'succeeded' };
+    } else this.current = { status: 'failed', message: 'Codex 登录未完成，请重新发起。' };
+  }
+}
+
 type Pending = { resolve: (value: unknown) => void; reject: (error: Error) => void; timer: NodeJS.Timeout };
 
-export class CodexAppServerGateway implements AccountGateway {
+export class CodexAppServerGateway implements AccountLoginGateway {
   private child?: ChildProcessWithoutNullStreams;
   private ready?: Promise<void>;
   private pending = new Map<number, Pending>();
+  private listeners = new Set<(method: string, params: unknown) => void>();
   private id = 0;
 
   constructor(private options: { codexHome: string; codexPath?: string; timeoutMs?: number }) {}
+
+  subscribe(listener: (method: string, params: unknown) => void) {
+    this.listeners.add(listener);
+    return () => { this.listeners.delete(listener); };
+  }
 
   async request(method: string, params: unknown = {}): Promise<unknown> {
     await this.ensureReady();
@@ -182,6 +281,10 @@ export class CodexAppServerGateway implements AccountGateway {
   private receive(line: string) {
     let message: any;
     try { message = JSON.parse(line); } catch { return; }
+    if (message.id === undefined && typeof message.method === 'string') {
+      for (const listener of this.listeners) listener(message.method, message.params);
+      return;
+    }
     if (typeof message.id !== 'number') return;
     const item = this.pending.get(message.id);
     if (!item) return;
@@ -194,5 +297,6 @@ export class CodexAppServerGateway implements AccountGateway {
     this.child = undefined; this.ready = undefined;
     for (const item of this.pending.values()) { clearTimeout(item.timer); item.reject(error); }
     this.pending.clear();
+    for (const listener of this.listeners) listener('transport/closed', null);
   }
 }

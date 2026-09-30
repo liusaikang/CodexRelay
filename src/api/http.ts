@@ -6,10 +6,10 @@ import { z, ZodError } from 'zod';
 import { createMcpServer } from './mcp.js';
 import { TaskService } from '../service.js';
 import { AppError, idSchema, pageSchema, retrySchema } from '../types.js';
-import type { AccountStatusProvider } from '../account.js';
+import type { AccountStatusProvider, CodexLoginProvider } from '../account.js';
 import { invocationQuerySchema } from '../invocations.js';
 
-export function createHttpApp(service: TaskService, token: string, accountStatus?: AccountStatusProvider) {
+export function createHttpApp(service: TaskService, token: string, accountStatus?: AccountStatusProvider, codexLogin?: CodexLoginProvider) {
   if (token.length < 24) throw new Error('Service token must be at least 24 characters');
   const app = express();
   app.disable('x-powered-by');
@@ -134,6 +134,17 @@ export function createHttpApp(service: TaskService, token: string, accountStatus
   });
   app.get('/console/settings', (_req, res) => res.json(service.getSettings()));
   app.put('/console/settings', async (req, res) => res.json(await service.updateSettings(req.body, consoleSession(req)!.username)));
+  app.use('/console/codex-login', (req, res, next) => {
+    if (!consoleSession(req)) { res.status(403).json({ error: { code: 'CONSOLE_ONLY', message: 'Console login required' } }); return; }
+    if (req.method !== 'GET' && !sameOriginPost(req)) {
+      res.status(403).json({ error: { code: 'ORIGIN_DENIED', message: 'Same-origin request required' } }); return;
+    }
+    if (!codexLogin) { res.status(409).json({ error: { code: 'CODEX_LOGIN_DISABLED', message: 'Codex runner is not enabled' } }); return; }
+    next();
+  });
+  app.get('/console/codex-login', (_req, res) => res.json(codexLogin!.status()));
+  app.post('/console/codex-login/start', async (_req, res) => res.json(await codexLogin!.start()));
+  app.post('/console/codex-login/cancel', async (_req, res) => res.json(await codexLogin!.cancel()));
   const pagination = (query: unknown) => {
     const raw = z.object({ offset: z.coerce.number().optional(), limit: z.coerce.number().optional() }).parse(query);
     return pageSchema.parse(raw);
