@@ -1,6 +1,7 @@
 export function createSettingsPanel({ api, formatTime, refreshHealth }) {
   const $ = id => document.getElementById(id);
   const form = $('settings-form');
+  const effortOptions = Array.from($('setting-effort').options);
   let snapshot;
   let busy = false;
 
@@ -33,7 +34,7 @@ export function createSettingsPanel({ api, formatTime, refreshHealth }) {
     }));
     $('setting-provider').value = settings.activeProvider;
     showProvider(settings.defaultModel);
-    $('setting-effort').value = settings.defaultReasoningEffort ?? 'high';
+    showEfforts(settings.defaultReasoningEffort ?? 'high');
     $('setting-log-enabled').checked = settings.invocationLog.enabled;
     $('setting-retention').value = settings.invocationLog.retentionDays;
     sync();
@@ -54,6 +55,14 @@ export function createSettingsPanel({ api, formatTime, refreshHealth }) {
     }));
     $('setting-model').value = selectedModel ?? provider?.defaultModel ?? models[0] ?? '';
     $('setting-model').disabled = models.length === 0;
+  }
+
+  function showEfforts(preferred = $('setting-effort').value) {
+    const flash = $('setting-provider').value === 'model_studio' && $('setting-model').value === 'qwen3.7-flash';
+    const choices = flash ? effortOptions.filter(option => option.value === 'low' || option.value === 'medium') : effortOptions;
+    $('setting-effort').replaceChildren(...choices);
+    $('setting-effort').value = choices.some(option => option.value === preferred) ? preferred : 'medium';
+    $('setting-effort-help').classList.toggle('hidden', !flash);
   }
 
   function dirty() {
@@ -104,9 +113,10 @@ export function createSettingsPanel({ api, formatTime, refreshHealth }) {
   $('setting-provider').addEventListener('change', () => {
     const provider = snapshot?.providers?.find(item => item.id === $('setting-provider').value);
     showProvider(provider?.defaultModel ?? provider?.models?.[0] ?? null);
-    $('setting-effort').value = 'high';
+    showEfforts('high');
     sync();
   });
+  $('setting-model').addEventListener('change', () => { showEfforts(); sync(); });
   $('settings-refresh').addEventListener('click', () => {
     if (dirty() && !window.confirm('放弃未保存的修改并重新读取配置？')) return;
     void load(true);

@@ -23,14 +23,22 @@ const savedSchema = settingsUpdateSchema.extend({
   version: z.literal(1), updatedAt: z.iso.datetime({ offset: true }), updatedBy: z.string().min(1).max(100),
 }).strict();
 
-const fromConfig = (config: RuntimeConfig): RuntimeSettings => ({
-  maxConcurrent: config.maxConcurrent, maxQueued: config.maxQueued,
-  timeoutSeconds: config.timeoutSeconds, queueTimeoutSeconds: config.queueTimeoutSeconds ?? 1800,
-  activeProvider: config.activeProvider ?? 'openai',
-  defaultModel: config.defaultModel ?? config.modelProviders?.find(provider => provider.id === (config.activeProvider ?? 'openai'))?.defaultModel ?? null,
-  defaultReasoningEffort: config.defaultReasoningEffort ?? 'high',
-  invocationLog: { enabled: config.invocationLog?.enabled ?? false, retentionDays: config.invocationLog?.retentionDays ?? 30 },
-});
+const isQwenFlash = (providerId: string, model: string | null) => providerId === 'model_studio' && model === 'qwen3.7-flash';
+const flashEffortSupported = (effort: string) => effort === 'low' || effort === 'medium';
+const normalizeEffort = (providerId: string, model: string | null, effort: RuntimeSettings['defaultReasoningEffort']) =>
+  isQwenFlash(providerId, model) && (!effort || !flashEffortSupported(effort)) ? 'medium' : effort ?? 'high';
+
+const fromConfig = (config: RuntimeConfig): RuntimeSettings => {
+  const activeProvider = config.activeProvider ?? 'openai';
+  const defaultModel = config.defaultModel ?? config.modelProviders?.find(provider => provider.id === activeProvider)?.defaultModel ?? null;
+  return {
+    maxConcurrent: config.maxConcurrent, maxQueued: config.maxQueued,
+    timeoutSeconds: config.timeoutSeconds, queueTimeoutSeconds: config.queueTimeoutSeconds ?? 1800,
+    activeProvider, defaultModel,
+    defaultReasoningEffort: normalizeEffort(activeProvider, defaultModel, config.defaultReasoningEffort ?? null),
+    invocationLog: { enabled: config.invocationLog?.enabled ?? false, retentionDays: config.invocationLog?.retentionDays ?? 30 },
+  };
+};
 
 export class RuntimeSettingsStore {
   private readonly file: string;
@@ -42,6 +50,7 @@ export class RuntimeSettingsStore {
   constructor(private readonly config: RuntimeConfig) {
     this.file = join(config.dataDir, 'runtime-settings.json');
     this.defaults = fromConfig(config);
+    this.config.defaultReasoningEffort = this.defaults.defaultReasoningEffort ?? 'high';
   }
 
   private apply(settings: RuntimeSettings) {
@@ -74,8 +83,10 @@ export class RuntimeSettingsStore {
       throw new Error(`Configured provider ${saved.settings.activeProvider} is no longer available`);
     }
     const provider = this.config.modelProviders?.find(item => item.id === saved.settings.activeProvider);
-    this.apply({ ...saved.settings, defaultModel: saved.settings.defaultModel ?? provider?.defaultModel ?? null,
-      defaultReasoningEffort: saved.settings.defaultReasoningEffort ?? this.defaults.defaultReasoningEffort ?? 'high' });
+    const defaultModel = saved.settings.defaultModel ?? provider?.defaultModel ?? null;
+    this.apply({ ...saved.settings, defaultModel,
+      defaultReasoningEffort: normalizeEffort(saved.settings.activeProvider, defaultModel,
+        saved.settings.defaultReasoningEffort ?? this.defaults.defaultReasoningEffort) });
     this.revision = saved.revision;
     this.updatedAt = saved.updatedAt;
     this.updatedBy = saved.updatedBy;
@@ -108,8 +119,13 @@ export class RuntimeSettingsStore {
       throw new AppError('INVALID_MODEL', 'Selected model is not configured for this provider.', 400);
     }
     if (input.settings.invocationLog.enabled && !this.config.invocationLog) throw new AppError('INVALID_SETTINGS', 'Invocation log directory is not configured.', 400);
-    const settings = { ...input.settings, defaultModel: input.settings.defaultModel ?? provider.defaultModel ?? null,
-      defaultReasoningEffort: input.settings.defaultReasoningEffort ?? this.defaults.defaultReasoningEffort ?? 'high' };
+    const defaultModel = input.settings.defaultModel ?? provider.defaultModel ?? null;
+    const effort = input.settings.defaultReasoningEffort ?? (isQwenFlash(input.settings.activeProvider, defaultModel)
+      ? 'medium' : this.defaults.defaultReasoningEffort ?? 'high');
+    if (isQwenFlash(input.settings.activeProvider, defaultModel) && !flashEffortSupported(effort)) {
+      throw new AppError('INVALID_REASONING_EFFORT', 'qwen3.7-flash supports only low or medium reasoning effort.', 400);
+    }
+    const settings = { ...input.settings, defaultModel, defaultReasoningEffort: effort };
     const saved = { version: 1 as const, revision: this.revision + 1, settings,
       updatedAt: new Date().toISOString(), updatedBy: actor.slice(0, 100) };
     await atomicJson(this.file, saved);

@@ -52,3 +52,45 @@ it('normalizes an empty API reasoning effort to high', async () => {
     expect(config.defaultReasoningEffort).toBe('high');
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
+
+it('rejects unsupported reasoning effort for Qwen flash through the settings API', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'relay-flash-settings-'));
+  try {
+    const config = await loadConfig(resolve('config/development.yaml'));
+    config.dataDir = dir;
+    const store = new RuntimeSettingsStore(config);
+    const initial = store.snapshot();
+    await expect(store.update({ revision: 0, settings: { ...initial.settings,
+      activeProvider: 'model_studio', defaultModel: 'qwen3.7-flash', defaultReasoningEffort: 'high' } }, 'test'))
+      .rejects.toMatchObject({ code: 'INVALID_REASONING_EFFORT' });
+    const saved = await store.update({ revision: 0, settings: { ...initial.settings,
+      activeProvider: 'model_studio', defaultModel: 'qwen3.7-flash', defaultReasoningEffort: 'medium' } }, 'test');
+    expect(saved.settings.defaultReasoningEffort).toBe('medium');
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+it('normalizes an existing Qwen flash high setting on startup', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'relay-flash-migration-'));
+  try {
+    const config = await loadConfig(resolve('config/development.yaml'));
+    config.dataDir = dir;
+    const store = new RuntimeSettingsStore(config);
+    const settings = { ...store.snapshot().settings, activeProvider: 'model_studio',
+      defaultModel: 'qwen3.7-flash', defaultReasoningEffort: 'high' };
+    await writeFile(join(dir, 'runtime-settings.json'), JSON.stringify({ version: 1, revision: 2,
+      settings, updatedAt: new Date().toISOString(), updatedBy: 'test' }));
+    await store.load();
+    expect(store.snapshot().settings.defaultReasoningEffort).toBe('medium');
+    expect(config.defaultReasoningEffort).toBe('medium');
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+it('uses medium for Qwen flash when it is selected in the base configuration', async () => {
+  const config = await loadConfig(resolve('config/development.yaml'));
+  config.activeProvider = 'model_studio';
+  config.defaultModel = 'qwen3.7-flash';
+  config.defaultReasoningEffort = 'high';
+  const store = new RuntimeSettingsStore(config);
+  expect(store.snapshot().settings.defaultReasoningEffort).toBe('medium');
+  expect(config.defaultReasoningEffort).toBe('medium');
+});

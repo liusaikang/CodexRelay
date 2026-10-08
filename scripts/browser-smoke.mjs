@@ -45,7 +45,7 @@ try {
     activeProvider: 'openai', defaultModel: 'gpt-6-sol', defaultReasoningEffort: 'high', invocationLog: { enabled: true, retentionDays: 30 } };
   const providers = [
     { id: 'openai', label: 'OpenAI / Codex', defaultModel: 'gpt-6-sol', models: ['gpt-6-sol', 'gpt-6-astra', 'gpt-6-luna'], baseUrl: null, credentialConfigured: true },
-    { id: 'model_studio', label: '阿里云百炼', defaultModel: 'qwen3.7-max', models: ['qwen3.7-max', 'qwen3.7-plus'], baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', credentialConfigured: true },
+    { id: 'model_studio', label: '阿里云百炼', defaultModel: 'qwen3.7-max', models: ['qwen3.7-max', 'qwen3.7-plus', 'qwen3.7-flash'], baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', credentialConfigured: true },
   ];
   let liveSettings = structuredClone(baseSettings);
   const logDetail = { taskId, sessionId, transport: 'mcp', question: '<script>window.__injected = true</script> 日志测试', context: { account: 'demo-user' }, status: 'succeeded', receivedAt: '2026-09-24T06:00:00.000Z', startedAt: '2026-09-24T06:00:01.000Z', finishedAt: '2026-09-24T06:00:03.000Z', durationMs: 2000, usage: { input_tokens: 100, output_tokens: 20 }, resultMarkdown: '<img src=x onerror=alert(1)> 完整回答', error: null };
@@ -179,7 +179,7 @@ try {
   await page.getByLabel('模型供应商').selectOption('model_studio');
   await expect(page.locator('#setting-model')).toHaveValue('qwen3.7-max');
   await expect(page.getByLabel('推理强度')).toHaveValue('high');
-  await expect(page.getByLabel('模型', { exact: true }).locator('option')).toHaveCount(2);
+  await expect(page.getByLabel('模型', { exact: true }).locator('option')).toHaveCount(3);
   await expect(page.locator('#setting-model option[value="gpt-6-sol"]')).toHaveCount(0);
   await page.getByLabel('模型', { exact: true }).selectOption('qwen3.7-plus');
   await expect(page.locator('#setting-endpoint')).toHaveText('https://dashscope.aliyuncs.com/compatible-mode/v1');
@@ -187,6 +187,18 @@ try {
   await page.locator('#settings-save').click();
   await expect(page.locator('#settings-feedback')).toHaveText('已保存并应用。');
   assert.equal(liveSettings.activeProvider, 'model_studio');
+  await page.getByLabel('模型', { exact: true }).selectOption('qwen3.7-flash');
+  await expect(page.getByLabel('推理强度')).toHaveValue('medium');
+  await expect(page.locator('#setting-effort option')).toHaveCount(2);
+  await expect(page.locator('#setting-effort option[value="high"]')).toHaveCount(0);
+  await expect(page.locator('#setting-effort option[value="low"]')).toHaveCount(1);
+  page.once('dialog', async dialog => { await dialog.accept(); });
+  await page.locator('#settings-save').click();
+  await expect(page.locator('#settings-feedback')).toHaveText('已保存并应用。');
+  assert.equal(liveSettings.defaultModel, 'qwen3.7-flash');
+  assert.equal(liveSettings.defaultReasoningEffort, 'medium');
+  await page.getByLabel('模型', { exact: true }).selectOption('qwen3.7-plus');
+  await expect(page.locator('#setting-effort option[value="high"]')).toHaveCount(1);
   await checkLayout(page);
   logsEnabled = false;
   await page.getByRole('button', { name: '调用日志', exact: true }).click();
