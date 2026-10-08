@@ -51,14 +51,16 @@ codex:
       baseUrl: https://dashscope.aliyuncs.com/compatible-mode/v1
       envKey: DASHSCOPE_API_KEY
       defaultModel: qwen3.7-max
-      models: [qwen3.8-max, qwen3.7-max, qwen3.7-plus, qwen3.7-flash]
+      models: [qwen3.7-max, qwen3.7-plus, qwen3.7-flash, glm-5.3]
   sandboxMode: ${CODEX_SANDBOX_MODE:-danger-full-access}
   # path: /absolute/path/to/codex
 ```
 
 `runner` 只能选择 `codex` 或 `demo`。`codex.path` 可选，接受 CLI 可执行文件的绝对路径，也接受相对于 YAML 配置文件所在目录的路径，加载时通过 `resolve` 转为绝对路径；省略时使用 SDK 配套 CLI。Windows 指向真实可执行文件，不使用 `.ps1` 包装脚本。
 
-运行配置页的模型下拉选项来自各供应商的 `models` 列表；按实际可用模型维护该列表后重启服务。切换已配置的供应商或模型并保存则立即作用于新任务，无需重启。已有运行配置中的旧模型名会继续显示，避免修改其他设置时丢失原值；新的选择仍须来自供应商列表。
+运行配置页的模型下拉选项来自各供应商的 `models` 列表；按实际可用模型维护该列表后重启服务。切换已配置的供应商或模型并保存则立即作用于新任务，无需重启。若已保存的模型从列表中移除，重启后运行配置会回退到该供应商的默认模型；已提交任务仍使用提交时的配置。
+
+`glm-5.3` 使用百炼兼容 Responses API，推理强度仅支持 `low`、`high`、`max`，切换时默认 `high`。百炼官方建议按业务空间地域使用专属 Base URL；现有通用地址是否支持此模型应在目标环境单独验证。参见[阿里云 GLM 文档](https://help.aliyun.com/zh/model-studio/glm)。
 
 `maxConcurrent` 控制全局执行名额，`maxQueued` 控制额外等待任务数；`maxQueued: 0` 表示只接收可立即运行的任务。`timeoutSeconds` 是服务端执行超时，不是客户端轮询超时。同一会话即使有空闲名额也只能串行，模型账号额度仍可能限制实际吞吐量。
 

@@ -16,7 +16,7 @@ it('exposes provider-specific model choices and rejects a model from another pro
     expect(initial.settings.defaultModel).toBe('gpt-6-sol');
     expect(initial.settings.defaultReasoningEffort).toBe('high');
     expect(initial.providers.find(provider => provider.id === 'model_studio')?.models).toContain('qwen3.7-max');
-    expect(initial.providers.find(provider => provider.id === 'model_studio')?.models).toContain('qwen3.8-max');
+    expect(initial.providers.find(provider => provider.id === 'model_studio')?.models).toContain('glm-5.3');
     await expect(store.update({ revision: 0, settings: { ...initial.settings,
       activeProvider: 'model_studio', defaultModel: 'gpt-6-sol' } }, 'test')).rejects.toMatchObject({ code: 'INVALID_MODEL' });
     const saved = await store.update({ revision: 0, settings: { ...initial.settings,
@@ -25,19 +25,21 @@ it('exposes provider-specific model choices and rejects a model from another pro
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
-it('accepts Qwen 3.8 Max with xhigh and rejects unsupported effort', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'relay-qwen38-settings-'));
+it('replaces a retired persisted model with the provider default and rejects new selections of it', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'relay-retired-model-'));
   try {
     const config = await loadConfig(resolve('config/development.yaml'));
     config.dataDir = dir;
     const store = new RuntimeSettingsStore(config);
-    const initial = store.snapshot();
-    await expect(store.update({ revision: 0, settings: { ...initial.settings,
-      activeProvider: 'model_studio', defaultModel: 'qwen3.8-max', defaultReasoningEffort: 'ultra' } }, 'test'))
-      .rejects.toMatchObject({ code: 'INVALID_REASONING_EFFORT' });
-    const saved = await store.update({ revision: 0, settings: { ...initial.settings,
-      activeProvider: 'model_studio', defaultModel: 'qwen3.8-max', defaultReasoningEffort: 'xhigh' } }, 'test');
-    expect(saved.settings).toMatchObject({ defaultModel: 'qwen3.8-max', defaultReasoningEffort: 'xhigh' });
+    const settings = { ...store.snapshot().settings, activeProvider: 'model_studio', defaultModel: 'retired-model' };
+    await writeFile(join(dir, 'runtime-settings.json'), JSON.stringify({ version: 1, revision: 2,
+      settings, updatedAt: new Date().toISOString(), updatedBy: 'test' }));
+    await store.load();
+    const snapshot = store.snapshot();
+    expect(snapshot.settings.defaultModel).toBe('qwen3.7-max');
+    expect(snapshot.providers.find(provider => provider.id === 'model_studio')?.models).not.toContain('retired-model');
+    await expect(store.update({ revision: snapshot.revision, settings: { ...snapshot.settings,
+      defaultModel: 'retired-model' } }, 'test')).rejects.toMatchObject({ code: 'INVALID_MODEL' });
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
@@ -110,4 +112,26 @@ it('uses medium for Qwen flash when it is selected in the base configuration', a
   const store = new RuntimeSettingsStore(config);
   expect(store.snapshot().settings.defaultReasoningEffort).toBe('medium');
   expect(config.defaultReasoningEffort).toBe('medium');
+});
+
+it('accepts only documented reasoning efforts for GLM and normalizes a persisted unsupported value', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'relay-glm-settings-'));
+  try {
+    const config = await loadConfig(resolve('config/development.yaml'));
+    config.dataDir = dir;
+    const store = new RuntimeSettingsStore(config);
+    const initial = store.snapshot();
+    await expect(store.update({ revision: 0, settings: { ...initial.settings,
+      activeProvider: 'model_studio', defaultModel: 'glm-5.3', defaultReasoningEffort: 'medium' } }, 'test'))
+      .rejects.toMatchObject({ code: 'INVALID_REASONING_EFFORT' });
+    const saved = await store.update({ revision: 0, settings: { ...initial.settings,
+      activeProvider: 'model_studio', defaultModel: 'glm-5.3', defaultReasoningEffort: 'max' } }, 'test');
+    expect(saved.settings).toMatchObject({ defaultModel: 'glm-5.3', defaultReasoningEffort: 'max' });
+    const persisted = { ...saved.settings, defaultReasoningEffort: 'medium' };
+    await writeFile(join(dir, 'runtime-settings.json'), JSON.stringify({ version: 1, revision: 2,
+      settings: persisted, updatedAt: new Date().toISOString(), updatedBy: 'test' }));
+    const reloaded = new RuntimeSettingsStore(config);
+    await reloaded.load();
+    expect(reloaded.snapshot().settings.defaultReasoningEffort).toBe('high');
+  } finally { await rm(dir, { recursive: true, force: true }); }
 });

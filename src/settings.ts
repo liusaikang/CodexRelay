@@ -24,12 +24,12 @@ const savedSchema = settingsUpdateSchema.extend({
 }).strict();
 
 const isQwenFlash = (providerId: string, model: string | null) => providerId === 'model_studio' && model === 'qwen3.7-flash';
-const isQwen38Max = (providerId: string, model: string | null) => providerId === 'model_studio' && model === 'qwen3.8-max';
+const isGlm53 = (providerId: string, model: string | null) => providerId === 'model_studio' && model === 'glm-5.3';
 const flashEffortSupported = (effort: string) => effort === 'low' || effort === 'medium';
-const qwen38MaxEffortSupported = (effort: string) => effort === 'low' || effort === 'medium' || effort === 'xhigh';
+const glm53EffortSupported = (effort: string) => effort === 'low' || effort === 'high' || effort === 'max';
 const normalizeEffort = (providerId: string, model: string | null, effort: RuntimeSettings['defaultReasoningEffort']) =>
   isQwenFlash(providerId, model) && (!effort || !flashEffortSupported(effort)) ? 'medium'
-    : isQwen38Max(providerId, model) && (!effort || !qwen38MaxEffortSupported(effort)) ? 'xhigh'
+    : isGlm53(providerId, model) && (!effort || !glm53EffortSupported(effort)) ? 'high'
       : effort ?? 'high';
 
 const fromConfig = (config: RuntimeConfig): RuntimeSettings => {
@@ -87,7 +87,8 @@ export class RuntimeSettingsStore {
       throw new Error(`Configured provider ${saved.settings.activeProvider} is no longer available`);
     }
     const provider = this.config.modelProviders?.find(item => item.id === saved.settings.activeProvider);
-    const defaultModel = saved.settings.defaultModel ?? provider?.defaultModel ?? null;
+    const defaultModel = saved.settings.defaultModel && (!provider?.models || provider.models.includes(saved.settings.defaultModel))
+      ? saved.settings.defaultModel : provider?.defaultModel ?? null;
     this.apply({ ...saved.settings, defaultModel,
       defaultReasoningEffort: normalizeEffort(saved.settings.activeProvider, defaultModel,
         saved.settings.defaultReasoningEffort ?? this.defaults.defaultReasoningEffort) });
@@ -101,8 +102,7 @@ export class RuntimeSettingsStore {
       defaults: structuredClone(this.defaults), updatedAt: this.updatedAt, updatedBy: this.updatedBy,
       providers: (this.config.modelProviders ?? [{ id: 'openai', label: 'OpenAI / Codex' }]).map(provider => ({
         id: provider.id, label: provider.label, defaultModel: provider.defaultModel ?? null,
-        models: [...new Set([...(provider.models ?? []), ...(
-          this.config.activeProvider === provider.id && this.config.defaultModel ? [this.config.defaultModel] : [])])],
+        models: [...new Set(provider.models ?? [])],
         baseUrl: provider.baseUrl ?? null,
         credentialConfigured: provider.id === 'openai'
           ? !!process.env.CODEX_API_KEY || existsSync(join(this.config.codexHome, 'auth.json'))
@@ -118,19 +118,18 @@ export class RuntimeSettingsStore {
     if (!provider) {
       throw new AppError('INVALID_PROVIDER', 'Selected model provider is not configured on this server.', 400);
     }
-    if (provider.models && input.settings.defaultModel && !provider.models.includes(input.settings.defaultModel)
-      && !(input.settings.activeProvider === this.config.activeProvider && input.settings.defaultModel === this.config.defaultModel)) {
+    if (provider.models && input.settings.defaultModel && !provider.models.includes(input.settings.defaultModel)) {
       throw new AppError('INVALID_MODEL', 'Selected model is not configured for this provider.', 400);
     }
     if (input.settings.invocationLog.enabled && !this.config.invocationLog) throw new AppError('INVALID_SETTINGS', 'Invocation log directory is not configured.', 400);
     const defaultModel = input.settings.defaultModel ?? provider.defaultModel ?? null;
     const effort = input.settings.defaultReasoningEffort ?? (isQwenFlash(input.settings.activeProvider, defaultModel)
-      ? 'medium' : isQwen38Max(input.settings.activeProvider, defaultModel) ? 'xhigh' : this.defaults.defaultReasoningEffort ?? 'high');
+      ? 'medium' : isGlm53(input.settings.activeProvider, defaultModel) ? 'high' : this.defaults.defaultReasoningEffort ?? 'high');
     if (isQwenFlash(input.settings.activeProvider, defaultModel) && !flashEffortSupported(effort)) {
       throw new AppError('INVALID_REASONING_EFFORT', 'qwen3.7-flash supports only low or medium reasoning effort.', 400);
     }
-    if (isQwen38Max(input.settings.activeProvider, defaultModel) && !qwen38MaxEffortSupported(effort)) {
-      throw new AppError('INVALID_REASONING_EFFORT', 'qwen3.8-max supports only low, medium or xhigh reasoning effort.', 400);
+    if (isGlm53(input.settings.activeProvider, defaultModel) && !glm53EffortSupported(effort)) {
+      throw new AppError('INVALID_REASONING_EFFORT', 'glm-5.3 supports only low, high or max reasoning effort.', 400);
     }
     const settings = { ...input.settings, defaultModel, defaultReasoningEffort: effort };
     const saved = { version: 1 as const, revision: this.revision + 1, settings,

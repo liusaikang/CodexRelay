@@ -91,7 +91,7 @@ it('rejects a custom provider without its credential before starting Codex', asy
   try {
     await expect(runCodex({ taskId: 'missing-key', question: 'Analyze', directory: dir, codexHome: dir,
       providerId: 'model_studio', providerBaseUrl: 'https://dashscope.example.test/compatible-mode/v1',
-      providerEnvKey: 'DASHSCOPE_API_KEY', model: 'qwen3.8-max', env: {} },
+      providerEnvKey: 'DASHSCOPE_API_KEY', model: 'qwen3.7-max', env: {} },
     new AbortController().signal, async () => {})).rejects.toMatchObject({ code: 'MODEL_CREDENTIAL_MISSING' });
   } finally { await rm(dir, { recursive: true, force: true }); }
 });

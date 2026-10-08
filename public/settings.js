@@ -45,28 +45,28 @@ export function createSettingsPanel({ api, formatTime, refreshHealth }) {
     $('setting-endpoint').textContent = provider?.baseUrl ?? 'Codex 内置 OpenAI 地址';
     $('setting-credential').textContent = provider?.credentialConfigured ? '认证配置已检测到，连通性以实际调用为准。'
       : '尚未检测到该供应商的认证配置，切换后任务可能失败。';
-    const models = [...new Set([...(provider?.models ?? []), ...(provider?.defaultModel ? [provider.defaultModel] : []),
-      ...(selectedModel ? [selectedModel] : [])])];
+    const models = [...new Set(provider?.models ?? [])];
     $('setting-model').replaceChildren(...models.map(model => {
       const option = document.createElement('option');
       option.value = model;
       option.textContent = model;
       return option;
     }));
-    $('setting-model').value = selectedModel ?? provider?.defaultModel ?? models[0] ?? '';
+    $('setting-model').value = selectedModel && models.includes(selectedModel)
+      ? selectedModel : provider?.defaultModel ?? models[0] ?? '';
     $('setting-model').disabled = models.length === 0;
   }
 
   function showEfforts(preferred = $('setting-effort').value) {
     const flash = $('setting-provider').value === 'model_studio' && $('setting-model').value === 'qwen3.7-flash';
-    const max38 = $('setting-provider').value === 'model_studio' && $('setting-model').value === 'qwen3.8-max';
+    const glm = $('setting-provider').value === 'model_studio' && $('setting-model').value === 'glm-5.3';
     const choices = flash ? effortOptions.filter(option => option.value === 'low' || option.value === 'medium')
-      : max38 ? effortOptions.filter(option => ['low', 'medium', 'xhigh'].includes(option.value)) : effortOptions;
+      : glm ? effortOptions.filter(option => ['low', 'high', 'max'].includes(option.value)) : effortOptions;
     $('setting-effort').replaceChildren(...choices);
-    $('setting-effort').value = choices.some(option => option.value === preferred) ? preferred : max38 ? 'xhigh' : 'medium';
+    $('setting-effort').value = choices.some(option => option.value === preferred) ? preferred : flash ? 'medium' : 'high';
     $('setting-effort-help').textContent = flash ? 'qwen3.7-flash 仅支持 low 和 medium。'
-      : max38 ? 'qwen3.8-max 支持 low、medium 和 xhigh。' : '';
-    $('setting-effort-help').classList.toggle('hidden', !flash && !max38);
+      : glm ? 'glm-5.3 仅支持 low、high 和 max。' : '';
+    $('setting-effort-help').classList.toggle('hidden', !flash && !glm);
   }
 
   function dirty() {
@@ -121,7 +121,7 @@ export function createSettingsPanel({ api, formatTime, refreshHealth }) {
     sync();
   });
   $('setting-model').addEventListener('change', () => {
-    showEfforts($('setting-model').value === 'qwen3.8-max' ? 'xhigh' : undefined);
+    showEfforts($('setting-model').value === 'glm-5.3' ? 'high' : undefined);
     sync();
   });
   $('settings-refresh').addEventListener('click', () => {

@@ -45,7 +45,7 @@ try {
     activeProvider: 'openai', defaultModel: 'gpt-6-sol', defaultReasoningEffort: 'high', invocationLog: { enabled: true, retentionDays: 30 } };
   const providers = [
     { id: 'openai', label: 'OpenAI / Codex', defaultModel: 'gpt-6-sol', models: ['gpt-6-sol', 'gpt-6-astra', 'gpt-6-luna'], baseUrl: null, credentialConfigured: true },
-    { id: 'model_studio', label: '阿里云百炼', defaultModel: 'qwen3.7-max', models: ['qwen3.8-max', 'qwen3.7-max', 'qwen3.7-plus', 'qwen3.7-flash'], baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', credentialConfigured: true },
+    { id: 'model_studio', label: '阿里云百炼', defaultModel: 'qwen3.7-max', models: ['qwen3.7-max', 'qwen3.7-plus', 'qwen3.7-flash', 'glm-5.3'], baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', credentialConfigured: true },
   ];
   let liveSettings = structuredClone(baseSettings);
   const logDetail = { taskId, sessionId, transport: 'mcp', question: '<script>window.__injected = true</script> 日志测试', context: { account: 'demo-user' }, status: 'succeeded', receivedAt: '2026-09-24T06:00:00.000Z', startedAt: '2026-09-24T06:00:01.000Z', finishedAt: '2026-09-24T06:00:03.000Z', durationMs: 2000, usage: { input_tokens: 100, output_tokens: 20 }, resultMarkdown: '<img src=x onerror=alert(1)> 完整回答', error: null };
@@ -187,10 +187,11 @@ try {
   await page.locator('#settings-save').click();
   await expect(page.locator('#settings-feedback')).toHaveText('已保存并应用。');
   assert.equal(liveSettings.activeProvider, 'model_studio');
-  await page.getByLabel('模型', { exact: true }).selectOption('qwen3.8-max');
-  await expect(page.getByLabel('推理强度')).toHaveValue('xhigh');
+  await page.getByLabel('模型', { exact: true }).selectOption('glm-5.3');
+  await expect(page.getByLabel('推理强度')).toHaveValue('high');
   await expect(page.locator('#setting-effort option')).toHaveCount(3);
-  await expect(page.locator('#setting-effort option[value="ultra"]')).toHaveCount(0);
+  await expect(page.locator('#setting-effort option[value="max"]')).toHaveCount(1);
+  await expect(page.locator('#setting-effort option[value="medium"]')).toHaveCount(0);
   await page.getByLabel('模型', { exact: true }).selectOption('qwen3.7-flash');
   await expect(page.getByLabel('推理强度')).toHaveValue('medium');
   await expect(page.locator('#setting-effort option')).toHaveCount(2);
