@@ -16,11 +16,28 @@ it('exposes provider-specific model choices and rejects a model from another pro
     expect(initial.settings.defaultModel).toBe('gpt-6-sol');
     expect(initial.settings.defaultReasoningEffort).toBe('high');
     expect(initial.providers.find(provider => provider.id === 'model_studio')?.models).toContain('qwen3.7-max');
+    expect(initial.providers.find(provider => provider.id === 'model_studio')?.models).toContain('qwen3.8-max');
     await expect(store.update({ revision: 0, settings: { ...initial.settings,
       activeProvider: 'model_studio', defaultModel: 'gpt-6-sol' } }, 'test')).rejects.toMatchObject({ code: 'INVALID_MODEL' });
     const saved = await store.update({ revision: 0, settings: { ...initial.settings,
       activeProvider: 'model_studio', defaultModel: 'qwen3.7-plus' } }, 'test');
     expect(saved.settings).toMatchObject({ activeProvider: 'model_studio', defaultModel: 'qwen3.7-plus' });
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+it('accepts Qwen 3.8 Max with xhigh and rejects unsupported effort', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'relay-qwen38-settings-'));
+  try {
+    const config = await loadConfig(resolve('config/development.yaml'));
+    config.dataDir = dir;
+    const store = new RuntimeSettingsStore(config);
+    const initial = store.snapshot();
+    await expect(store.update({ revision: 0, settings: { ...initial.settings,
+      activeProvider: 'model_studio', defaultModel: 'qwen3.8-max', defaultReasoningEffort: 'ultra' } }, 'test'))
+      .rejects.toMatchObject({ code: 'INVALID_REASONING_EFFORT' });
+    const saved = await store.update({ revision: 0, settings: { ...initial.settings,
+      activeProvider: 'model_studio', defaultModel: 'qwen3.8-max', defaultReasoningEffort: 'xhigh' } }, 'test');
+    expect(saved.settings).toMatchObject({ defaultModel: 'qwen3.8-max', defaultReasoningEffort: 'xhigh' });
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 

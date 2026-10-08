@@ -59,10 +59,14 @@ export function createSettingsPanel({ api, formatTime, refreshHealth }) {
 
   function showEfforts(preferred = $('setting-effort').value) {
     const flash = $('setting-provider').value === 'model_studio' && $('setting-model').value === 'qwen3.7-flash';
-    const choices = flash ? effortOptions.filter(option => option.value === 'low' || option.value === 'medium') : effortOptions;
+    const max38 = $('setting-provider').value === 'model_studio' && $('setting-model').value === 'qwen3.8-max';
+    const choices = flash ? effortOptions.filter(option => option.value === 'low' || option.value === 'medium')
+      : max38 ? effortOptions.filter(option => ['low', 'medium', 'xhigh'].includes(option.value)) : effortOptions;
     $('setting-effort').replaceChildren(...choices);
-    $('setting-effort').value = choices.some(option => option.value === preferred) ? preferred : 'medium';
-    $('setting-effort-help').classList.toggle('hidden', !flash);
+    $('setting-effort').value = choices.some(option => option.value === preferred) ? preferred : max38 ? 'xhigh' : 'medium';
+    $('setting-effort-help').textContent = flash ? 'qwen3.7-flash 仅支持 low 和 medium。'
+      : max38 ? 'qwen3.8-max 支持 low、medium 和 xhigh。' : '';
+    $('setting-effort-help').classList.toggle('hidden', !flash && !max38);
   }
 
   function dirty() {
@@ -116,7 +120,10 @@ export function createSettingsPanel({ api, formatTime, refreshHealth }) {
     showEfforts('high');
     sync();
   });
-  $('setting-model').addEventListener('change', () => { showEfforts(); sync(); });
+  $('setting-model').addEventListener('change', () => {
+    showEfforts($('setting-model').value === 'qwen3.8-max' ? 'xhigh' : undefined);
+    sync();
+  });
   $('settings-refresh').addEventListener('click', () => {
     if (dirty() && !window.confirm('放弃未保存的修改并重新读取配置？')) return;
     void load(true);

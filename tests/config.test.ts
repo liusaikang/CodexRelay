@@ -52,6 +52,7 @@ it('loads the development environment with its existing history and invocation l
   expect(config.modelProviders?.[0]?.defaultModel).toBe('gpt-6-sol');
   expect(config.defaultReasoningEffort).toBe('high');
   expect(config.modelProviders?.[1]?.models).toContain('qwen3.7-plus');
+  expect(config.modelProviders?.[1]?.models).toContain('qwen3.8-max');
 });
 
 it('validates configured model providers and never accepts a credential value in place of an environment variable name', async () => {

@@ -37,4 +37,4 @@ codex:
       baseUrl: https://dashscope.aliyuncs.com/compatible-mode/v1
       envKey: DASHSCOPE_API_KEY
       defaultModel: qwen3.7-max
-      models: [qwen3.7-max, qwen3.7-plus, qwen3.7-flash]
+      models: [qwen3.8-max, qwen3.7-max, qwen3.7-plus, qwen3.7-flash]

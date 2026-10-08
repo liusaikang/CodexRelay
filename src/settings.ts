@@ -24,9 +24,13 @@ const savedSchema = settingsUpdateSchema.extend({
 }).strict();
 
 const isQwenFlash = (providerId: string, model: string | null) => providerId === 'model_studio' && model === 'qwen3.7-flash';
+const isQwen38Max = (providerId: string, model: string | null) => providerId === 'model_studio' && model === 'qwen3.8-max';
 const flashEffortSupported = (effort: string) => effort === 'low' || effort === 'medium';
+const qwen38MaxEffortSupported = (effort: string) => effort === 'low' || effort === 'medium' || effort === 'xhigh';
 const normalizeEffort = (providerId: string, model: string | null, effort: RuntimeSettings['defaultReasoningEffort']) =>
-  isQwenFlash(providerId, model) && (!effort || !flashEffortSupported(effort)) ? 'medium' : effort ?? 'high';
+  isQwenFlash(providerId, model) && (!effort || !flashEffortSupported(effort)) ? 'medium'
+    : isQwen38Max(providerId, model) && (!effort || !qwen38MaxEffortSupported(effort)) ? 'xhigh'
+      : effort ?? 'high';
 
 const fromConfig = (config: RuntimeConfig): RuntimeSettings => {
   const activeProvider = config.activeProvider ?? 'openai';
@@ -121,9 +125,12 @@ export class RuntimeSettingsStore {
     if (input.settings.invocationLog.enabled && !this.config.invocationLog) throw new AppError('INVALID_SETTINGS', 'Invocation log directory is not configured.', 400);
     const defaultModel = input.settings.defaultModel ?? provider.defaultModel ?? null;
     const effort = input.settings.defaultReasoningEffort ?? (isQwenFlash(input.settings.activeProvider, defaultModel)
-      ? 'medium' : this.defaults.defaultReasoningEffort ?? 'high');
+      ? 'medium' : isQwen38Max(input.settings.activeProvider, defaultModel) ? 'xhigh' : this.defaults.defaultReasoningEffort ?? 'high');
     if (isQwenFlash(input.settings.activeProvider, defaultModel) && !flashEffortSupported(effort)) {
       throw new AppError('INVALID_REASONING_EFFORT', 'qwen3.7-flash supports only low or medium reasoning effort.', 400);
+    }
+    if (isQwen38Max(input.settings.activeProvider, defaultModel) && !qwen38MaxEffortSupported(effort)) {
+      throw new AppError('INVALID_REASONING_EFFORT', 'qwen3.8-max supports only low, medium or xhigh reasoning effort.', 400);
     }
     const settings = { ...input.settings, defaultModel, defaultReasoningEffort: effort };
     const saved = { version: 1 as const, revision: this.revision + 1, settings,
