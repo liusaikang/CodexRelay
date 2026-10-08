@@ -42,7 +42,11 @@ try {
   let logsEnabled = true, logsFail = false, scriptFail = false, accountFail = false;
   let settingsRevision = 0;
   const baseSettings = { maxConcurrent: 3, maxQueued: 100, timeoutSeconds: 600, queueTimeoutSeconds: 1800,
-    defaultModel: null, defaultReasoningEffort: null, invocationLog: { enabled: true, retentionDays: 30 } };
+    activeProvider: 'openai', defaultModel: 'gpt-6-sol', defaultReasoningEffort: 'high', invocationLog: { enabled: true, retentionDays: 30 } };
+  const providers = [
+    { id: 'openai', label: 'OpenAI / Codex', defaultModel: 'gpt-6-sol', models: ['gpt-6-sol', 'gpt-6-astra', 'gpt-6-luna'], baseUrl: null, credentialConfigured: true },
+    { id: 'model_studio', label: '阿里云百炼', defaultModel: 'qwen3.7-max', models: ['qwen3.7-max', 'qwen3.7-plus'], baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', credentialConfigured: true },
+  ];
   let liveSettings = structuredClone(baseSettings);
   const logDetail = { taskId, sessionId, transport: 'mcp', question: '<script>window.__injected = true</script> 日志测试', context: { account: 'demo-user' }, status: 'succeeded', receivedAt: '2026-09-24T06:00:00.000Z', startedAt: '2026-09-24T06:00:01.000Z', finishedAt: '2026-09-24T06:00:03.000Z', durationMs: 2000, usage: { input_tokens: 100, output_tokens: 20 }, resultMarkdown: '<img src=x onerror=alert(1)> 完整回答', error: null };
   await context.route('**/*', async route => {
@@ -78,7 +82,8 @@ try {
       }
       return route.fulfill({ json: { revision: settingsRevision, settings: liveSettings, defaults: baseSettings,
         updatedAt: settingsRevision ? '2026-09-28T09:00:00.000Z' : null,
-        updatedBy: settingsRevision ? 'admin' : null, logging: { healthy: true } } });
+        updatedBy: settingsRevision ? 'admin' : null, logging: { healthy: true }, providers,
+        jobs: { running: 1, queued: 1 } } });
     }
     if (path.startsWith('/v1/admin/invocations')) {
       if (logsFail) return route.fulfill({ status: 503, json: { error: { message: '日志请求失败' } } });
@@ -155,6 +160,12 @@ try {
   await checkLayout(page);
   await page.getByRole('button', { name: '运行配置', exact: true }).click();
   await expect(page.getByLabel('并发任务数')).toHaveValue('3');
+  await expect(page.getByLabel('模型供应商')).toHaveValue('openai');
+  await expect(page.getByLabel('模型', { exact: true }).locator('option')).toHaveCount(3);
+  await expect(page.getByLabel('模型', { exact: true })).toHaveValue('gpt-6-sol');
+  await expect(page.getByLabel('推理强度')).toHaveValue('high');
+  await expect(page.locator('#setting-effort option[value=""]')).toHaveCount(0);
+  await expect(page.locator('#setting-model option[value="gpt-6-sol"]')).toHaveCount(1);
   await expect(page.locator('#settings-save')).toBeDisabled();
   await page.getByLabel('并发任务数').fill('4');
   await expect(page.locator('#settings-save')).toBeEnabled();
@@ -165,6 +176,17 @@ try {
   await expect(page.getByLabel('并发任务数')).toHaveValue('3');
   await page.locator('#settings-cancel').click();
   await expect(page.getByLabel('并发任务数')).toHaveValue('4');
+  await page.getByLabel('模型供应商').selectOption('model_studio');
+  await expect(page.locator('#setting-model')).toHaveValue('qwen3.7-max');
+  await expect(page.getByLabel('推理强度')).toHaveValue('high');
+  await expect(page.getByLabel('模型', { exact: true }).locator('option')).toHaveCount(2);
+  await expect(page.locator('#setting-model option[value="gpt-6-sol"]')).toHaveCount(0);
+  await page.getByLabel('模型', { exact: true }).selectOption('qwen3.7-plus');
+  await expect(page.locator('#setting-endpoint')).toHaveText('https://dashscope.aliyuncs.com/compatible-mode/v1');
+  page.once('dialog', async dialog => { assert.match(dialog.message(), /排队中 1 个/); await dialog.accept(); });
+  await page.locator('#settings-save').click();
+  await expect(page.locator('#settings-feedback')).toHaveText('已保存并应用。');
+  assert.equal(liveSettings.activeProvider, 'model_studio');
   await checkLayout(page);
   logsEnabled = false;
   await page.getByRole('button', { name: '调用日志', exact: true }).click();

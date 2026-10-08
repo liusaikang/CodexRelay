@@ -15,7 +15,7 @@ const rules = [
 let localEnv = {};
 try { localEnv = parseEnv(await readFile('.env', 'utf8')); }
 catch (error) { if (error.code !== 'ENOENT') throw error; }
-const knownSecrets = ['CODEX_MCP_TOKEN', 'CODEX_API_KEY', 'OPENAI_API_KEY', 'CODEX_CONSOLE_PASSWORD']
+const knownSecrets = ['CODEX_MCP_TOKEN', 'CODEX_API_KEY', 'OPENAI_API_KEY', 'DASHSCOPE_API_KEY', 'CODEX_CONSOLE_PASSWORD']
   .flatMap(name => [process.env[name], localEnv[name]].filter(value => value && value.length >= 16).map(value => ({name,value})));
 const issues = [];
 for (const file of files) {

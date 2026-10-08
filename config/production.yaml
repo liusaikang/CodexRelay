@@ -25,5 +25,17 @@ codex:
   home: ${CODEX_HOME}
   defaultWorkingDirectory: ${CODEX_WORKSPACE}
   defaultModel: ${CODEX_MODEL:-}
-  defaultReasoningEffort: ${CODEX_MODEL_REASONING_EFFORT:-}
-  envAllowlist: [CODEX_API_KEY, HTTPS_PROXY, HTTP_PROXY, NO_PROXY]
+  defaultReasoningEffort: ${CODEX_MODEL_REASONING_EFFORT:-high}
+  activeProvider: ${CODEX_PROVIDER:-openai}
+  providers:
+    - id: openai
+      label: OpenAI / Codex
+      defaultModel: ${CODEX_MODEL:-gpt-6-sol}
+      models: [gpt-6-sol, gpt-6-astra, gpt-6-luna]
+    - id: model_studio
+      label: 阿里云百炼
+      baseUrl: https://dashscope.aliyuncs.com/compatible-mode/v1
+      envKey: DASHSCOPE_API_KEY
+      defaultModel: qwen3.7-max
+      models: [qwen3.7-max, qwen3.7-plus, qwen3.7-flash]
+  envAllowlist: [CODEX_API_KEY, DASHSCOPE_API_KEY, HTTPS_PROXY, HTTP_PROXY, NO_PROXY]

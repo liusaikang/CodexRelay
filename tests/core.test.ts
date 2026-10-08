@@ -53,7 +53,7 @@ describe('durable task scheduling', () => {
     const savedSession = JSON.parse(await readFile(join(dir, 'sessions', `${first.sessionId}.json`), 'utf8'));
     const oldHash = createHash('sha256').update(JSON.stringify({ policy: 'native-full-access-v1',
       directory: await realpath(config.defaultWorkingDirectory), model: config.defaultModel,
-      modelReasoningEffort: config.defaultReasoningEffort, codexHome: config.codexHome,
+      modelReasoningEffort: config.defaultReasoningEffort, providerId: 'openai', codexHome: config.codexHome,
       runner: config.runner, envAllowlist: config.envAllowlist, codexPath: config.codexPath })).digest('hex');
     expect(savedSession.configHash).toBe(oldHash);
     runner.calls[0]!.finish();
@@ -135,6 +135,59 @@ describe('durable task scheduling', () => {
     expect(runner.calls[0]!.execution.model).toBe('gpt-test');
     expect(runner.calls[0]!.execution.modelReasoningEffort).toBe('high');
     await service.submit({ ...input, sessionId: first.sessionId });
+  });
+  it('applies a global provider switch only to new submissions while preserving queued and running work', async () => {
+    const { service, runner, config } = await fixture(1, 3);
+    config.modelProviders = [
+      { id: 'openai', label: 'OpenAI / Codex' },
+      { id: 'model_studio', label: 'Model Studio', baseUrl: 'https://dashscope.example.test/compatible-mode/v1', envKey: 'DASHSCOPE_API_KEY', defaultModel: 'qwen-test' },
+    ];
+    config.activeProvider = 'openai';
+    config.envAllowlist.push('DASHSCOPE_API_KEY');
+    const running = await service.submit({ question: 'old running' });
+    const queued = await service.submit({ question: 'old queued' });
+    await until(() => runner.calls.length === 1);
+    const original = service.getSettings();
+    await service.updateSettings({ revision: original.revision, settings: {
+      ...original.settings, activeProvider: 'model_studio', defaultModel: 'qwen-test', defaultReasoningEffort: null,
+    } }, 'admin');
+    expect(runner.calls[0]!.execution.providerId).toBe('openai');
+    expect(service.getTask(queued.taskId).status).toBe('queued');
+    await expect(service.submit({ question: 'follow-up', sessionId: running.sessionId })).rejects.toMatchObject({ code: 'SESSION_CONFIG_CHANGED' });
+    const newTask = await service.submit({ question: 'new provider' });
+    runner.calls[0]!.finish();
+    await until(() => runner.calls.length === 2);
+    expect(runner.calls[1]!.execution).toMatchObject({ taskId: queued.taskId, providerId: 'openai' });
+    runner.calls[1]!.finish();
+    await until(() => runner.calls.length === 3);
+    expect(runner.calls[2]!.execution).toMatchObject({ taskId: newTask.taskId, providerId: 'model_studio',
+      providerBaseUrl: 'https://dashscope.example.test/compatible-mode/v1', providerEnvKey: 'DASHSCOPE_API_KEY', model: 'qwen-test' });
+  });
+  it('restores the global provider after restart without migrating previously queued tasks', async () => {
+    const { service, runner, config, dir } = await fixture(1, 2);
+    config.modelProviders = [
+      { id: 'openai', label: 'OpenAI / Codex' },
+      { id: 'model_studio', label: 'Model Studio', baseUrl: 'https://dashscope.example.test/v1', envKey: 'DASHSCOPE_API_KEY', defaultModel: 'qwen-test' },
+    ];
+    const running = await service.submit({ question: 'old running' });
+    const queued = await service.submit({ question: 'old queued' });
+    await until(() => runner.calls.length === 1);
+    const current = service.getSettings();
+    await service.updateSettings({ revision: current.revision, settings: {
+      ...current.settings, activeProvider: 'model_studio', defaultModel: 'qwen-test',
+    } }, 'admin');
+    await service.close();
+    expect(service.getTask(running.taskId).status).toBe('interrupted');
+    const resumedRunner = new ControlledRunner();
+    const resumed = new TaskService({ ...config, activeProvider: 'openai', defaultModel: undefined }, new FileStore(dir), resumedRunner);
+    await resumed.init(); cleanup.push(() => resumed.close());
+    expect(resumed.getSettings().settings).toMatchObject({ activeProvider: 'model_studio', defaultModel: 'qwen-test' });
+    await until(() => resumedRunner.calls.length === 1);
+    expect(resumedRunner.calls[0]!.execution).toMatchObject({ taskId: queued.taskId, providerId: 'openai' });
+    const fresh = await resumed.submit({ question: 'new after restart' });
+    resumedRunner.calls[0]!.finish();
+    await until(() => resumedRunner.calls.length === 2);
+    expect(resumedRunner.calls[1]!.execution).toMatchObject({ taskId: fresh.taskId, providerId: 'model_studio', model: 'qwen-test' });
   });
   it('does not silently create a session for an unknown id', async () => {
     const { service } = await fixture();
@@ -221,11 +274,7 @@ describe('durable task scheduling', () => {
     config.defaultWorkingDirectory = dir;
     config.defaultModel = 'changed-default';
     config.defaultReasoningEffort = 'high';
-    await service.submit({ ...input, sessionId: first.sessionId });
-    await until(() => runner.calls.length === 2);
-    expect(runner.calls[1]!.execution.directory).toBe(await realpath(cwd));
-    expect(runner.calls[1]!.execution.model).toBeUndefined();
-    expect(runner.calls[1]!.execution.modelReasoningEffort).toBeUndefined();
+    await expect(service.submit({ ...input, sessionId: first.sessionId })).rejects.toMatchObject({ code: 'SESSION_CONFIG_CHANGED' });
     expect(service.getSession(first.sessionId, 0, 20).workingDirectory).toBe(await realpath(cwd));
   });
   it('keeps legacy history readable but rejects continuation and queued replay', async () => {

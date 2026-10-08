@@ -25,13 +25,32 @@ const tasksSchema = z.object({
   timeoutSeconds: z.number().int().min(1).max(86400).default(600),
   queueTimeoutSeconds: z.number().int().min(1).max(604800).default(1800),
 }).strict();
+const providerSchema = z.object({
+  id: z.string().regex(/^[a-z][a-z0-9_-]{0,39}$/), label: z.string().trim().min(1).max(80),
+  defaultModel: z.string().max(120).optional(), models: z.array(z.string().trim().min(1).max(120)).min(1).optional(), baseUrl: z.url().optional(),
+  envKey: z.string().regex(/^[A-Z][A-Z0-9_]*$/).optional(),
+}).strict().superRefine((provider, context) => {
+  if (provider.id === 'openai') {
+    if (provider.baseUrl || provider.envKey) context.addIssue({ code: 'custom', message: 'Built-in openai provider cannot override baseUrl or envKey' });
+  } else if (!provider.baseUrl || !provider.envKey) {
+    context.addIssue({ code: 'custom', message: 'Custom providers require baseUrl and envKey' });
+  }
+  if (provider.baseUrl) {
+    const url = new URL(provider.baseUrl);
+    if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) {
+      context.addIssue({ code: 'custom', message: 'Provider baseUrl must be an HTTPS URL without credentials, query or fragment' });
+    }
+  }
+});
 const codexSchema = z.object({
   sandboxMode: z.string().default('danger-full-access'),
   home: z.string().default('../data/codex-home'),
   defaultWorkingDirectory: z.string().default('../examples/workspace'),
   defaultModel: z.string().optional(), defaultReasoningEffort: z.string().optional(),
+  activeProvider: z.string().default('openai'),
+  providers: z.array(providerSchema).min(1).default([{ id: 'openai', label: 'OpenAI / Codex' }]),
   path: z.string().optional(),
-  envAllowlist: z.array(z.string()).default(['CODEX_API_KEY', 'HTTPS_PROXY', 'HTTP_PROXY', 'NO_PROXY']),
+  envAllowlist: z.array(z.string()).default(['CODEX_API_KEY', 'DASHSCOPE_API_KEY', 'HTTPS_PROXY', 'HTTP_PROXY', 'NO_PROXY']),
 }).strict();
 const configSchema = z.object({
   invocationLog: z.object({
@@ -59,6 +78,23 @@ export async function loadConfig(file: string): Promise<RuntimeConfig> {
     throw new Error('Legacy capability configuration is no longer supported. Use codex.defaultWorkingDirectory and native .agents/skills; see docs/configuration.md.');
   }
   const config = configSchema.parse(raw);
+  const providers = config.codex.providers.map(provider => ({ ...provider,
+    defaultModel: optionalExpanded(provider.defaultModel), baseUrl: optionalExpanded(provider.baseUrl) }));
+  const providerIds = providers.map(provider => provider.id);
+  const activeProvider = expandEnv(config.codex.activeProvider);
+  if (new Set(providerIds).size !== providerIds.length) throw new Error('codex.providers contains duplicate ids');
+  if (!providerIds.includes(activeProvider)) throw new Error('codex.activeProvider must name a configured provider');
+  for (const provider of providers) {
+    if (provider.models && new Set(provider.models).size !== provider.models.length) {
+      throw new Error(`codex.providers.${provider.id}.models contains duplicate ids`);
+    }
+    if (provider.models && provider.defaultModel && !provider.models.includes(provider.defaultModel)) {
+      provider.models.push(provider.defaultModel);
+    }
+    if (provider.envKey && !config.codex.envAllowlist.includes(provider.envKey)) {
+      throw new Error(`codex.envAllowlist must include ${provider.envKey}`);
+    }
+  }
   const host = expandEnv(config.server.host);
   const allowedHosts = config.server.allowedHosts.map(expandEnv);
   const allowedOrigins = config.server.allowedOrigins.map(value => {
@@ -91,7 +127,8 @@ export async function loadConfig(file: string): Promise<RuntimeConfig> {
     dataDir: resolve(base, expandEnv(config.dataDir)), codexHome: resolve(base, expandEnv(config.codex.home)),
     defaultWorkingDirectory: await resolveWorkingDirectory(resolve(base, expandEnv(config.codex.defaultWorkingDirectory))),
     defaultModel: optionalExpanded(config.codex.defaultModel),
-    defaultReasoningEffort: effort ? modelReasoningEffortSchema.parse(effort) : undefined,
+    defaultReasoningEffort: effort ? modelReasoningEffortSchema.parse(effort) : 'high',
+    activeProvider, modelProviders: providers,
     codexPath: config.codex.path ? resolve(base, expandEnv(config.codex.path)) : undefined,
     envAllowlist: config.codex.envAllowlist,
   };

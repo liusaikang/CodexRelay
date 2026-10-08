@@ -1,14 +1,16 @@
 import { readFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
 import { atomicJson } from './storage.js';
-import { AppError, modelReasoningEffortSchema, type RuntimeConfig } from './types.js';
+import { AppError, modelReasoningEffortSchema, type ModelProvider, type RuntimeConfig } from './types.js';
 
 export const runtimeSettingsSchema = z.object({
   maxConcurrent: z.number().int().min(1).max(64),
   maxQueued: z.number().int().min(0).max(10000),
   timeoutSeconds: z.number().int().min(1).max(86400),
   queueTimeoutSeconds: z.number().int().min(1).max(604800),
+  activeProvider: z.string().regex(/^[a-z][a-z0-9_-]{0,39}$/),
   defaultModel: z.string().trim().min(1).max(120).nullable(),
   defaultReasoningEffort: modelReasoningEffortSchema.nullable(),
   invocationLog: z.object({ enabled: z.boolean(), retentionDays: z.number().int().min(1).max(3650) }).strict(),
@@ -24,7 +26,9 @@ const savedSchema = settingsUpdateSchema.extend({
 const fromConfig = (config: RuntimeConfig): RuntimeSettings => ({
   maxConcurrent: config.maxConcurrent, maxQueued: config.maxQueued,
   timeoutSeconds: config.timeoutSeconds, queueTimeoutSeconds: config.queueTimeoutSeconds ?? 1800,
-  defaultModel: config.defaultModel ?? null, defaultReasoningEffort: config.defaultReasoningEffort ?? null,
+  activeProvider: config.activeProvider ?? 'openai',
+  defaultModel: config.defaultModel ?? config.modelProviders?.find(provider => provider.id === (config.activeProvider ?? 'openai'))?.defaultModel ?? null,
+  defaultReasoningEffort: config.defaultReasoningEffort ?? 'high',
   invocationLog: { enabled: config.invocationLog?.enabled ?? false, retentionDays: config.invocationLog?.retentionDays ?? 30 },
 });
 
@@ -45,8 +49,9 @@ export class RuntimeSettingsStore {
     this.config.maxQueued = settings.maxQueued;
     this.config.timeoutSeconds = settings.timeoutSeconds;
     this.config.queueTimeoutSeconds = settings.queueTimeoutSeconds;
+    this.config.activeProvider = settings.activeProvider;
     this.config.defaultModel = settings.defaultModel ?? undefined;
-    this.config.defaultReasoningEffort = settings.defaultReasoningEffort ?? undefined;
+    this.config.defaultReasoningEffort = settings.defaultReasoningEffort ?? 'high';
     if (this.config.invocationLog) {
       this.config.invocationLog.enabled = settings.invocationLog.enabled;
       this.config.invocationLog.retentionDays = settings.invocationLog.retentionDays;
@@ -60,9 +65,17 @@ export class RuntimeSettingsStore {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
       throw error;
     }
-    const saved = savedSchema.parse(JSON.parse(content));
+    const raw = JSON.parse(content);
+    const saved = savedSchema.parse({ ...raw, settings: {
+      ...raw.settings, activeProvider: raw.settings?.activeProvider ?? this.config.activeProvider ?? 'openai',
+    } });
     if (saved.settings.invocationLog.enabled && !this.config.invocationLog) throw new Error('Invocation log directory is not configured');
-    this.apply(saved.settings);
+    if (!(this.config.modelProviders ?? [{ id: 'openai' }]).some(provider => provider.id === saved.settings.activeProvider)) {
+      throw new Error(`Configured provider ${saved.settings.activeProvider} is no longer available`);
+    }
+    const provider = this.config.modelProviders?.find(item => item.id === saved.settings.activeProvider);
+    this.apply({ ...saved.settings, defaultModel: saved.settings.defaultModel ?? provider?.defaultModel ?? null,
+      defaultReasoningEffort: saved.settings.defaultReasoningEffort ?? this.defaults.defaultReasoningEffort ?? 'high' });
     this.revision = saved.revision;
     this.updatedAt = saved.updatedAt;
     this.updatedBy = saved.updatedBy;
@@ -70,14 +83,34 @@ export class RuntimeSettingsStore {
 
   snapshot() {
     return { revision: this.revision, settings: structuredClone(fromConfig(this.config)),
-      defaults: structuredClone(this.defaults), updatedAt: this.updatedAt, updatedBy: this.updatedBy };
+      defaults: structuredClone(this.defaults), updatedAt: this.updatedAt, updatedBy: this.updatedBy,
+      providers: (this.config.modelProviders ?? [{ id: 'openai', label: 'OpenAI / Codex' }]).map(provider => ({
+        id: provider.id, label: provider.label, defaultModel: provider.defaultModel ?? null,
+        models: [...new Set([...(provider.models ?? []), ...(
+          this.config.activeProvider === provider.id && this.config.defaultModel ? [this.config.defaultModel] : [])])],
+        baseUrl: provider.baseUrl ?? null,
+        credentialConfigured: provider.id === 'openai'
+          ? !!process.env.CODEX_API_KEY || existsSync(join(this.config.codexHome, 'auth.json'))
+          : !!(provider.envKey && process.env[provider.envKey]),
+      })) };
   }
 
   async update(raw: unknown, actor: string) {
     const input = settingsUpdateSchema.parse(raw);
     if (input.revision !== this.revision) throw new AppError('SETTINGS_CONFLICT', 'Settings changed. Reload before saving.', 409);
+    const providers: ModelProvider[] = this.config.modelProviders ?? [{ id: 'openai', label: 'OpenAI / Codex' }];
+    const provider = providers.find(item => item.id === input.settings.activeProvider);
+    if (!provider) {
+      throw new AppError('INVALID_PROVIDER', 'Selected model provider is not configured on this server.', 400);
+    }
+    if (provider.models && input.settings.defaultModel && !provider.models.includes(input.settings.defaultModel)
+      && !(input.settings.activeProvider === this.config.activeProvider && input.settings.defaultModel === this.config.defaultModel)) {
+      throw new AppError('INVALID_MODEL', 'Selected model is not configured for this provider.', 400);
+    }
     if (input.settings.invocationLog.enabled && !this.config.invocationLog) throw new AppError('INVALID_SETTINGS', 'Invocation log directory is not configured.', 400);
-    const saved = { version: 1 as const, revision: this.revision + 1, settings: input.settings,
+    const settings = { ...input.settings, defaultModel: input.settings.defaultModel ?? provider.defaultModel ?? null,
+      defaultReasoningEffort: input.settings.defaultReasoningEffort ?? this.defaults.defaultReasoningEffort ?? 'high' };
+    const saved = { version: 1 as const, revision: this.revision + 1, settings,
       updatedAt: new Date().toISOString(), updatedBy: actor.slice(0, 100) };
     await atomicJson(this.file, saved);
     this.apply(saved.settings);

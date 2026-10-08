@@ -40,7 +40,7 @@ flowchart TD
 
 ## 会话契约
 
-提交契约严格限定为必填 `question`，以及可选 `context`、`sessionId`、`idempotencyKey`、`sandboxMode`。`context` 必须是 JSON 对象，最多 16 KiB，由可信业务后端生成并作为不可信参考数据交给 Codex，不能作为指令或权限来源。工作目录、模型和推理强度不属于请求参数；新会话读取服务默认值并保存，默认配置变化不能悄悄改变既有会话。
+提交契约严格限定为必填 `question`，以及可选 `context`、`sessionId`、`idempotencyKey`、`sandboxMode`。`context` 必须是 JSON 对象，最多 16 KiB，由可信业务后端生成并作为不可信参考数据交给 Codex，不能作为指令或权限来源。工作目录、供应商、模型和推理强度不属于请求参数；新会话读取当前全局配置并保存。已接收任务保留提交时的配置，切换全局模型后旧会话追问需新建会话，不会悄悄跨供应商续接。
 
 业务 `sessionId` 映射到内部 Codex thread ID，二者不混用。无效 session 不静默创建新线程。同一幂等键和相同参数返回原任务，参数改变报冲突；幂等键不是会话 ID，也不保证上游模型计费的全链路 exactly-once。
 

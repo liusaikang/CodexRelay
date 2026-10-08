@@ -1,17 +1,17 @@
 # 配置与原生扩展
 
-基础配置在启动时加载，修改服务 YAML 后需重启。固定使用 `config/development.yaml` 与 `config/production.yaml`；`npm run start:dev` 和 `npm run start:prod` 分别加载对应文件，`npm start` 也指向开发环境。配置中的相对路径以 YAML 所在目录为基准。工作目录始终只由服务 YAML 控制；模型和推理强度由 YAML 基础值或管理员保存的运行配置控制，任务请求不能覆盖。
+基础配置在启动时加载，修改服务 YAML 后需重启。固定使用 `config/development.yaml` 与 `config/production.yaml`；`npm run start:dev` 和 `npm run start:prod` 分别加载对应文件，`npm start` 也指向开发环境。配置中的相对路径以 YAML 所在目录为基准。工作目录始终只由服务 YAML 控制；模型供应商、模型名和推理强度由 YAML 基础值或管理员保存的运行配置控制，任务请求不能覆盖。
 
 ## 控制台运行配置
 
 登录网页控制台的“运行配置”页，可编辑并保存以下两类参数，无需重启：
 
-- 即时应用：`maxConcurrent`、`maxQueued`、`timeoutSeconds`、`queueTimeoutSeconds`，以及新会话的默认模型和推理强度。提高并发上限会立即调度等待任务；降低并发上限不终止运行中的任务。已接收任务的队列期限、已运行任务的超时计时器、已有会话的模型和推理强度不会追溯修改。
+- 即时应用：`maxConcurrent`、`maxQueued`、`timeoutSeconds`、`queueTimeoutSeconds`，以及全局模型供应商、模型名和推理强度。提高并发上限会立即调度等待任务；降低并发上限不终止运行中的任务。模型设置在保存后统一作用于网页、HTTP 和 MCP 后续提交的新任务。运行中与已排队的任务使用提交时的供应商、模型和推理强度；已有会话若与当前全局模型设置不同，追问返回 `SESSION_CONFIG_CHANGED`，应新建会话。
 - 专门处理：调用日志的 `enabled` 和 `retentionDays`。保存时切换日志记录状态并按新保留期清理；关闭日志不删除旧文件，重新开启不会补录关闭期间的调用。缩短保留期可能删除超期记录，界面会先确认。
 
 控制台仅能通过登录会话修改这些白名单字段；服务 Bearer Token 不能用于配置接口。保存使用版本号防止覆盖其他管理员的修改。调整结果以原子写入方式保存在 `dataDir/runtime-settings.json`，重启后自动加载，独立于开发和生产两套数据目录。YAML 始终是基础值；控制台保存的运行配置优先生效。页面的“恢复基础值”只把表单填回当前 YAML 基础值，仍须点击保存。若要让重启后重新完全依照 YAML，停服后移除对应数据目录中的运行配置覆盖文件。
 
-服务地址、端口、目录、工作目录、认证、凭证、执行策略等不在控制台展示或编辑，仍通过部署配置管理。运行配置文件与任务数据同样敏感，不应公开或提交仓库。单实例独占数据目录，不支持多个实例同时改写此文件。
+服务地址、端口、目录、工作目录、认证、凭证、执行策略等不在控制台编辑，仍通过部署配置管理。控制台展示预配置供应商的请求地址和认证是否已检测到，但不展示密钥，也不允许浏览器任意修改地址。增加或修改供应商档案、地址、环境变量或原生 Codex 配置时仍需重启；在已有档案之间切换无需重启。运行配置文件与任务数据同样敏感，不应公开或提交仓库。单实例独占数据目录，不支持多个实例同时改写此文件。
 
 ## 服务配置
 
@@ -39,18 +39,32 @@ codex:
   home: ../data/codex-home
   defaultWorkingDirectory: ../examples/workspace
   defaultModel: ${CODEX_MODEL:-}
-  defaultReasoningEffort: ${CODEX_MODEL_REASONING_EFFORT:-}
+  defaultReasoningEffort: ${CODEX_MODEL_REASONING_EFFORT:-high}
+  activeProvider: ${CODEX_PROVIDER:-openai}
+  providers:
+    - id: openai
+      label: OpenAI / Codex
+      defaultModel: gpt-6-sol
+      models: [gpt-6-sol, gpt-6-astra, gpt-6-luna]
+    - id: model_studio
+      label: 阿里云百炼
+      baseUrl: https://dashscope.aliyuncs.com/compatible-mode/v1
+      envKey: DASHSCOPE_API_KEY
+      defaultModel: qwen3.7-max
+      models: [qwen3.7-max, qwen3.7-plus, qwen3.7-flash]
   sandboxMode: ${CODEX_SANDBOX_MODE:-danger-full-access}
   # path: /absolute/path/to/codex
 ```
 
 `runner` 只能选择 `codex` 或 `demo`。`codex.path` 可选，接受 CLI 可执行文件的绝对路径，也接受相对于 YAML 配置文件所在目录的路径，加载时通过 `resolve` 转为绝对路径；省略时使用 SDK 配套 CLI。Windows 指向真实可执行文件，不使用 `.ps1` 包装脚本。
 
+运行配置页的模型下拉选项来自各供应商的 `models` 列表；按实际可用模型维护该列表后重启服务。切换已配置的供应商或模型并保存则立即作用于新任务，无需重启。已有运行配置中的旧模型名会继续显示，避免修改其他设置时丢失原值；新的选择仍须来自供应商列表。
+
 `maxConcurrent` 控制全局执行名额，`maxQueued` 控制额外等待任务数；`maxQueued: 0` 表示只接收可立即运行的任务。`timeoutSeconds` 是服务端执行超时，不是客户端轮询超时。同一会话即使有空闲名额也只能串行，模型账号额度仍可能限制实际吞吐量。
 
 `queueTimeoutSeconds` 控制等待期限，默认 1800 秒，范围 1 到 604800 秒。会话依赖等待、人工确认等待、停机时间均计入；修改配置不延长已接受任务的期限。接收阶段容量自动取 `maxConcurrent + maxQueued`，无需新增容量参数。详细状态与恢复策略见 [任务调度](scheduling.md)。
 
-以上是开发环境示意，仅可在本机使用。生产配置要求环境变量明确指定任务目录、调用日志目录、Codex home、工作目录、控制台账号密码和公开访问来源。`codex.home` 是专用持久化目录，保存认证、原生配置和线程状态，不应直接使用开发者个人日常 home。`${VARIABLE}` 缺失时应报错；`${VARIABLE:-fallback}` 使用回退值。默认模型和推理强度展开为空表示未指定，由 Codex 采用原生默认值，不绑定某个模型名称。
+以上是开发环境示意，仅可在本机使用。生产配置要求环境变量明确指定任务目录、调用日志目录、Codex home、工作目录、控制台账号密码和公开访问来源。`codex.home` 是专用持久化目录，保存认证、原生配置和线程状态，不应直接使用开发者个人日常 home。`${VARIABLE}` 缺失时应报错；`${VARIABLE:-fallback}` 使用回退值。默认模型未指定时使用供应商档案中的模型；推理强度默认 `high`，旧运行配置中的空值也会按 `high` 执行。
 
 新配置不存在 `projects`、`capabilities`、`promptFile`、`skillFiles`、`mcpServers`，也不再使用顶层 `codexHome` 或 `execution`。这些旧字段不是新结构的别名，应删除并迁移，不要混用。
 
@@ -75,9 +89,9 @@ invocationLog:
 
 ## 请求与默认值
 
-新会话始终使用 `codex.defaultWorkingDirectory`、`codex.defaultModel` 和 `codex.defaultReasoningEffort`。默认工作目录必须存在并且运行账户可访问。
+新会话始终使用 `codex.defaultWorkingDirectory`、当前全局供应商及模型/推理强度。默认工作目录必须存在并且运行账户可访问。供应商档案在 YAML 中定义，`openai` 使用 Codex 内置请求地址和认证；自定义供应商需要 HTTPS `baseUrl`、已加入 `codex.envAllowlist` 的 `envKey`，并使用 Codex Responses API。密钥只放在进程环境中。
 
-已有会话使用创建时保存的目录、模型和推理强度，服务默认值后续变化不会悄悄改写旧会话。需要采用新执行配置时创建新会话。
+已接收任务使用提交时保存的供应商、模型和推理强度，排队跨重启也不会自行切换。已有会话的历史仍可读取，但全局供应商、模型或推理强度变更后，旧会话不能继续提交追问；请创建新会话。已有的旧版会话记录在 `openai` 档案下按兼容规则读取。
 
 请求只接受 `question`、`context`、`sessionId`、`idempotencyKey`、`sandboxMode`，不接受超时、执行目录、模型、推理强度、环境变量、CLI 路径、Codex home 或原生配置覆盖。
 
@@ -133,7 +147,25 @@ bearer_token_env_var = "EVIDENCE_MCP_TOKEN"
 enabled_tools = ["query", "search_logs", "manage_service"]
 ```
 
-默认会向 Codex 运行环境传递 `CODEX_API_KEY`、`HTTPS_PROXY`、`HTTP_PROXY`、`NO_PROXY`。将 `EVIDENCE_MCP_TOKEN` 这类额外变量加入 `codex.envAllowlist`，并由秘密管理系统或部署环境提供值。白名单还可按需加入其他明确需要的模型、代理或工具变量；不要通配继承业务后端环境，更不要把网关共享 Token 传给模型工具。`CODEX_API_KEY` 与 `server.tokenEnv` 指向的服务访问令牌用途不同。
+默认会向 Codex 运行环境传递 `CODEX_API_KEY`、`DASHSCOPE_API_KEY`、`HTTPS_PROXY`、`HTTP_PROXY`、`NO_PROXY`。将 `EVIDENCE_MCP_TOKEN` 这类额外变量加入 `codex.envAllowlist`，并由秘密管理系统或部署环境提供值。白名单还可按需加入其他明确需要的模型、代理或工具变量；不要通配继承业务后端环境，更不要把网关共享 Token 传给模型工具。`CODEX_API_KEY` 与 `server.tokenEnv` 指向的服务访问令牌用途不同。
+
+### 百炼按量计费模型
+
+将按量计费 API Key 作为 `DASHSCOPE_API_KEY` 提供给服务进程。当前版本的服务端 `codex.providers` 档案在每次执行时通过 Codex SDK 显式指定 provider；不要求修改专用 `codex.home/config.toml` 的 `model_provider`。不要把 API Key 写入 TOML、服务 YAML 或 Git 仓库。若手工运行 Codex CLI，可独立使用下列原生配置：
+
+```toml
+model_provider = "model_studio"
+model = "qwen3.7-max"
+
+[model_providers.model_studio]
+name = "Alibaba Cloud Model Studio"
+base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+env_key = "DASHSCOPE_API_KEY"
+wire_api = "responses"
+requires_openai_auth = false
+```
+
+`base_url` 使用华北 2 地域的公共域名；如果有业务空间 ID，可在服务 YAML 中配置对应的专属域名，改动后重启服务。API Key 的地域必须与域名匹配。控制台选择“阿里云百炼”时会自动填入档案默认模型，保存后新请求立即使用百炼地址；同一 Codex home 中原有 OpenAI 登录不会被删除。当前“账号额度”页面读取的是 OpenAI 账号状态，不代表百炼的余额或用量；验证百炼时以真实任务结果为准。百炼按量计费与 ChatGPT 订阅分别计费。参见[百炼 Codex 接入说明](https://help.aliyun.com/zh/model-studio/codex)。
 
 任务允许本地命令联网并启用实时 Web 搜索。模型传输、代理、上游 MCP、SQL、日志和 SSH 的认证与可达性仍由部署环境配置；网关不对这些能力追加只读过滤。
 

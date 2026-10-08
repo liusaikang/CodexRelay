@@ -156,17 +156,27 @@ export class TaskService {
   private available() {
     if (!this.initialized || this.closing || this.fault) throw new AppError('SERVICE_UNAVAILABLE', 'Service is stopping or storage is unavailable.', 503);
   }
+  private provider(id: string) {
+    const provider = (this.config.modelProviders ?? [{ id: 'openai', label: 'OpenAI / Codex' }]).find(item => item.id === id);
+    if (!provider) throw new AppError('PROVIDER_UNAVAILABLE', 'Session model provider is no longer configured. Start a new session.', 409);
+    return provider;
+  }
   private async context(session?: Session) {
     if (session && (session.version !== 2 || !session.workingDirectory)) {
       throw new AppError('LEGACY_SESSION', 'This legacy capability session is available for viewing only. Start a new native Codex session.', 409);
     }
+    const providerId = session ? session.providerId ?? 'openai' : this.config.activeProvider ?? 'openai';
+    const provider = this.provider(providerId);
     const runtime = {
       directory: await resolveWorkingDirectory(session?.workingDirectory ?? this.config.defaultWorkingDirectory),
-      model: session ? session.model : this.config.defaultModel,
+      model: session ? session.model : this.config.defaultModel ?? provider.defaultModel,
       modelReasoningEffort: session ? session.modelReasoningEffort : this.config.defaultReasoningEffort,
     };
     // Keep the original session identity; sandbox selection is persisted per task.
-    return { ...runtime, configHash: hash({ policy: 'native-full-access-v1', ...runtime, codexHome: this.config.codexHome, runner: this.config.runner, envAllowlist: this.config.envAllowlist, codexPath: this.config.codexPath }) };
+    return { ...runtime, providerId, configHash: hash({ policy: 'native-full-access-v1', ...runtime,
+      ...(session && !session.providerId ? {} : { providerId, providerBaseUrl: provider.baseUrl, providerEnvKey: provider.envKey }),
+      codexHome: this.config.codexHome,
+      runner: this.config.runner, envAllowlist: this.config.envAllowlist, codexPath: this.config.codexPath }) };
   }
   async submit(raw: SubmitInput, transport: InvocationTransport = 'http', retryOfTaskId?: string) {
     const request = submitSchema.parse(raw);
@@ -191,7 +201,15 @@ export class TaskService {
       this.available();
       const existing = request.sessionId ? this.sessions.get(request.sessionId) : undefined;
       if (request.sessionId && !existing) throw new AppError('NOT_FOUND', 'Session does not exist.', 404);
-      const { configHash, directory, model, modelReasoningEffort } = await this.context(existing);
+      if (existing) {
+        const activeProvider = this.config.activeProvider ?? 'openai';
+        const activeModel = this.config.defaultModel ?? this.provider(activeProvider).defaultModel;
+        if ((existing.providerId ?? 'openai') !== activeProvider || existing.model !== activeModel
+          || existing.modelReasoningEffort !== this.config.defaultReasoningEffort) {
+          throw new AppError('SESSION_CONFIG_CHANGED', 'The global model configuration changed. Start a new session.', 409);
+        }
+      }
+      const { configHash, directory, model, modelReasoningEffort, providerId } = await this.context(existing);
       let session: Session;
       if (request.sessionId) {
         if (existing!.configHash !== configHash) {
@@ -199,7 +217,8 @@ export class TaskService {
         }
         session = existing!;
       } else {
-        session = { version: 2, sessionId: `sess_${randomUUID()}`, workingDirectory: directory, model, modelReasoningEffort, configHash, createdAt: now() };
+        session = { version: 2, sessionId: `sess_${randomUUID()}`, workingDirectory: directory, model, modelReasoningEffort,
+          providerId, configHash, createdAt: now() };
       }
       const previous = [...this.pending.values()].findLast(task => task.sessionId === session.sessionId)
         ?? this.tasks.get(this.activeSessions.get(session.sessionId) ?? '');
@@ -268,12 +287,15 @@ export class TaskService {
   }
   private execution(task: Task): Execution {
     const session = this.sessions.get(task.sessionId)!;
+    const providerId = session.providerId ?? 'openai';
+    const provider = this.provider(providerId);
     const env: Record<string, string> = {};
     const permitted = ['PATH', 'Path', 'SystemRoot', 'WINDIR', 'COMSPEC', 'PATHEXT', 'TEMP', 'TMP', 'TMPDIR', 'HOME', 'USERPROFILE', 'LOCALAPPDATA', 'APPDATA', 'LANG', 'LC_ALL', ...this.config.envAllowlist];
     for (const key of permitted) if (process.env[key] !== undefined && key !== this.config.tokenEnv && key !== 'NODE_OPTIONS' && key !== 'CODEX_HOME') env[key] = process.env[key]!;
     env.CODEX_HOME = this.config.codexHome;
     return { taskId: task.taskId, question: task.request.question, context: task.request.context, directory: session.workingDirectory!,
       codexHome: this.config.codexHome, model: session.model, modelReasoningEffort: session.modelReasoningEffort, threadId: session.threadId,
+      providerId, providerBaseUrl: provider.baseUrl, providerEnvKey: provider.envKey,
       env, codexPath: this.config.codexPath, sandboxMode: task.sandboxMode ?? task.request.sandboxMode ?? 'danger-full-access' };
   }
   private async execute(task: Task, controller: AbortController) {
@@ -409,12 +431,15 @@ export class TaskService {
   }
   info() {
     const sandboxMode = this.config.sandboxMode ?? 'danger-full-access';
-    return { defaultWorkingDirectory: this.config.defaultWorkingDirectory, defaultModel: this.config.defaultModel,
+    const activeProvider = this.config.activeProvider ?? 'openai';
+    return { defaultWorkingDirectory: this.config.defaultWorkingDirectory,
+      activeProvider, defaultModel: this.config.defaultModel ?? this.provider(activeProvider).defaultModel,
       defaultReasoningEffort: this.config.defaultReasoningEffort, maxConcurrent: this.config.maxConcurrent, maxQueued: this.config.maxQueued,
       queueTimeoutSeconds: this.config.queueTimeoutSeconds ?? 1800, timeoutSeconds: this.config.timeoutSeconds, admissionLimit: this.admissionLimit,
       accessMode: sandboxMode, readOnly: sandboxMode === 'read-only', networkAccess: sandboxMode !== 'read-only', webSearch: 'live', runner: this.config.runner };
   }
-  getSettings() { this.readable(); return { ...this.settings.snapshot(), logging: this.invocations.status() }; }
+  getSettings() { this.readable(); return { ...this.settings.snapshot(), logging: this.invocations.status(),
+    jobs: { running: this.active.size, queued: this.pending.size } }; }
   async updateSettings(input: unknown, actor: string) {
     return this.exclusive(async () => {
       this.available();
@@ -423,7 +448,7 @@ export class TaskService {
         ? await this.invocations.reconfigure(this.config.invocationLog, [...this.tasks.values()])
         : this.invocations.status();
       await this.drain();
-      return { ...this.settings.snapshot(), logging };
+      return { ...this.settings.snapshot(), logging, jobs: { running: this.active.size, queued: this.pending.size } };
     });
   }
   health() { return { ready: this.initialized && !this.closing && !this.fault, running: this.active.size, queued: this.pending.size,

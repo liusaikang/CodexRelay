@@ -1,14 +1,23 @@
-import { Codex, type ThreadOptions } from '@openai/codex-sdk';
+import { Codex, type CodexOptions, type ThreadOptions } from '@openai/codex-sdk';
 import { mkdir } from 'node:fs/promises';
 import { AppError, type Execution, type RunEvent, type RunResult } from '../types.js';
 
 export async function runCodex(execution: Execution, signal: AbortSignal, emit: (event: RunEvent) => Promise<void>): Promise<RunResult> {
   await mkdir(execution.codexHome, { recursive: true, mode: 0o700 });
+  const nativeConfig: NonNullable<CodexOptions['config']> = { shell_environment_policy: { inherit: 'core' } };
+  if (execution.providerId) nativeConfig.model_provider = execution.providerId;
+  if (execution.providerId && execution.providerId !== 'openai') {
+    if (!execution.providerBaseUrl || !execution.providerEnvKey) {
+      throw new AppError('INVALID_PROVIDER', 'Custom provider is missing its endpoint or credential variable.');
+    }
+    nativeConfig.model_providers = { [execution.providerId]: {
+      name: execution.providerId, base_url: execution.providerBaseUrl, env_key: execution.providerEnvKey,
+      wire_api: 'responses', requires_openai_auth: false,
+    } };
+  }
   const codex = new Codex({
     env: execution.env, codexPathOverride: execution.codexPath,
-    config: {
-      shell_environment_policy: { inherit: 'core' },
-    },
+    config: nativeConfig,
   });
   const options: ThreadOptions = {
     model: execution.model, modelReasoningEffort: execution.modelReasoningEffort, workingDirectory: execution.directory,

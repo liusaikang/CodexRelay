@@ -128,6 +128,8 @@ it('limits live settings to the console session and applies validated changes', 
   const browserHeaders = { Cookie: cookie, Origin: base, 'Content-Type': 'application/json' };
   const original = await (await fetch(url, { headers: browserHeaders })).json();
   expect(original).toMatchObject({ revision: 0, settings: { invocationLog: { enabled: true } } });
+  expect(original.settings.activeProvider).toBe('openai');
+  expect(original.providers).toMatchObject([{ id: 'openai', label: 'OpenAI / Codex', defaultModel: null, baseUrl: null }]);
   expect(JSON.stringify(original)).not.toContain(token);
   const settings = { ...original.settings, maxConcurrent: 3 };
   expect((await fetch(url, { method: 'PUT', headers: { Cookie: cookie, 'Content-Type': 'application/json' },
@@ -135,6 +137,8 @@ it('limits live settings to the console session and applies validated changes', 
   expect((await fetch(url, { method: 'PUT', headers, body: JSON.stringify({ revision: 0, settings }) })).status).toBe(403);
   expect((await fetch(url, { method: 'PUT', headers: browserHeaders,
     body: JSON.stringify({ revision: 0, settings: { ...settings, dataDir: '/secret' } }) })).status).toBe(400);
+  expect((await fetch(url, { method: 'PUT', headers: browserHeaders,
+    body: JSON.stringify({ revision: 0, settings: { ...settings, activeProvider: 'unconfigured' } }) })).status).toBe(400);
   const saved = await fetch(url, { method: 'PUT', headers: browserHeaders, body: JSON.stringify({ revision: 0, settings }) });
   expect(saved.status).toBe(200);
   expect(await saved.json()).toMatchObject({ revision: 1, settings: { maxConcurrent: 3 } });

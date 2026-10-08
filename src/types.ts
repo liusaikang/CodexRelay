@@ -51,12 +51,16 @@ export const taskSchema = z.object({
 export const sessionSchema = z.object({
   version: z.union([z.literal(1), z.literal(2)]), sessionId: idSchema,
   workingDirectory: z.string().optional(), model: z.string().optional(), modelReasoningEffort: modelReasoningEffortSchema.optional(),
+  providerId: z.string().optional(),
   projectKey: z.string().optional(), capability: z.string().optional(),
   configHash: z.string(), createdAt: z.string(), threadId: z.string().optional(),
 }).refine(value => value.version === 1 || (!!value.workingDirectory && value.projectKey === undefined && value.capability === undefined), 'Native sessions require a working directory and no legacy routing fields');
 export type Task = z.infer<typeof taskSchema>;
 export type Session = z.infer<typeof sessionSchema>;
 export type RunResult = z.infer<typeof resultSchema>;
+export interface ModelProvider {
+  id: string; label: string; defaultModel?: string; models?: string[]; baseUrl?: string; envKey?: string;
+}
 export interface RuntimeConfig {
   sandboxMode?: z.infer<typeof sandboxModeSchema>;
   invocationLog?: { enabled: boolean; directory: string; retentionDays: number };
@@ -67,11 +71,13 @@ export interface RuntimeConfig {
   envAllowlist: string[]; codexPath?: string;
   timeoutSeconds: number; queueTimeoutSeconds?: number; defaultWorkingDirectory: string;
   defaultModel?: string; defaultReasoningEffort?: z.infer<typeof modelReasoningEffortSchema>;
+  activeProvider?: string; modelProviders?: ModelProvider[];
 }
 export interface Execution {
   sandboxMode?: z.infer<typeof sandboxModeSchema>;
   taskId: string; question: string; context?: z.infer<typeof contextSchema>; directory: string;
   codexHome: string; threadId?: string; model?: string; modelReasoningEffort?: z.infer<typeof modelReasoningEffortSchema>; codexPath?: string;
+  providerId?: string; providerBaseUrl?: string; providerEnvKey?: string;
   env: Record<string, string>;
 }
 export type RunEvent = { kind: 'thread'; threadId: string } | { kind: 'progress'; detail: string };

@@ -13,6 +13,7 @@ A self-hosted Codex task gateway with MCP tools, HTTP APIs, persistent sessions,
 - **接入简单**：`question` 必填，`context`、`sessionId`、`idempotencyKey` 可选。
 - **可控执行**：全局并发、等待容量、排队期限、执行超时，同一会话串行。
 - **保留记录**：任务、会话、运行配置和可选调用日志保存在文件中，无需外部数据库。
+- **全局模型切换**：支持 Codex 内置 OpenAI 模型和阿里云百炼的 Qwen 模型；控制台切换后，网页、HTTP 和 MCP 的新任务统一使用所选供应商与模型，已接收任务保留原配置。
 - **便于运维**：账号额度、会话历史、队列、取消、失败重试、调用日志及配置热更新。
 - **两种调用方式**：MCP Streamable HTTP / stdio，或普通 HTTP API。
 
@@ -42,6 +43,12 @@ npm run start:dev
 在克隆下来的仓库根目录运行上述命令。打开 <http://127.0.0.1:8787/>，开发控制台使用 `admin/admin`。`codex:auth` 读取开发配置的 Codex home，不会误用终端中另一套 `CODEX_HOME`。模型认证与控制台登录相互独立，详见 [登录与额度](docs/codex-auth.md)。`init:env` 创建随机服务 Token 和生产控制台密码，已有 `.env` 不会被覆盖。
 
 开发与生产分别使用 `config/development.yaml` 和 `config/production.yaml`，启动命令为 `npm run start:dev` / `npm run start:prod`。开发数据目录保持固定；生产目录由环境变量指定。配置热更新不改变数据目录。
+
+## 阿里云百炼模型
+
+使用百炼按量计费 API Key 时，在本地未提交的 `.env` 中设置 `DASHSCOPE_API_KEY`，再启动服务。在控制台的“运行配置”页选择“阿里云百炼”和需要的 Qwen 模型，保存后，网页、HTTP 和 MCP **后续提交的新任务**都会通过百炼的兼容接口执行；运行中和排队中的任务保持提交时的模型，切换供应商后需创建新会话才能继续提问。只使用百炼时无需执行上述 Codex 账号登录命令；“账号额度”页仍只显示 OpenAI 账号状态，不代表百炼余额。
+
+密钥不要写入服务 YAML 或提交到仓库。百炼地址、模型列表与更多配置说明见[模型供应商配置](docs/configuration.md#百炼按量计费模型)。当前 `compose.yaml` 尚未将 `DASHSCOPE_API_KEY` 传入容器；使用 Docker Compose 接入百炼前，需先在该文件的 `environment` 中增加密钥映射。
 
 ## Docker Compose
 

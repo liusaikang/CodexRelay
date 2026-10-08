@@ -59,3 +59,21 @@ it('presents optional structured context as reference data rather than instructi
     expect(sdk.input).toContain('"tenantId": "tenant-demo-001"');
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
+
+it('routes each execution through its pinned provider without changing the shared Codex home', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'codex-provider-'));
+  try {
+    await runCodex({ taskId: 'provider', question: 'Analyze', directory: dir, codexHome: dir,
+      providerId: 'model_studio', providerBaseUrl: 'https://dashscope.example.test/compatible-mode/v1',
+      providerEnvKey: 'DASHSCOPE_API_KEY', model: 'qwen-test', env: { DASHSCOPE_API_KEY: 'test-secret' } },
+    new AbortController().signal, async () => {});
+    expect(sdk.config.config).toMatchObject({ model_provider: 'model_studio', model_providers: { model_studio: {
+      base_url: 'https://dashscope.example.test/compatible-mode/v1', env_key: 'DASHSCOPE_API_KEY',
+      wire_api: 'responses', requires_openai_auth: false,
+    } } });
+    expect(JSON.stringify(sdk.config.config)).not.toContain('test-secret');
+    await runCodex({ taskId: 'openai', question: 'Analyze', directory: dir, codexHome: dir,
+      providerId: 'openai', env: {} }, new AbortController().signal, async () => {});
+    expect(sdk.config.config.model_provider).toBe('openai');
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});

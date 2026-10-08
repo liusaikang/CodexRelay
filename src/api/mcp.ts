@@ -18,7 +18,7 @@ export function createMcpServer(service: TaskService, transport: 'mcp' | 'stdio'
   const read = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false };
   server.registerTool('codex_submit_task', {
     title: '提交 Codex 分析任务',
-    description: 'Submit a question and optional structured context to the native Codex Harness, then immediately return taskId/sessionId/status. Optional sandboxMode uses native Codex values: read-only, workspace-write, danger-full-access; omission uses the service default for this task. Poll codex_get_task. The service uses its configured working directory, model and reasoning effort. Omit sessionId for a new task; pass it to continue the same Codex thread. Reuse idempotencyKey only when retrying identical parameters, including sandboxMode.',
+    description: 'Submit a question and optional structured context to the native Codex Harness, then immediately return taskId/sessionId/status. Optional sandboxMode uses native Codex values: read-only, workspace-write, danger-full-access; omission uses the service default for this task. Poll codex_get_task. The service uses its current global provider, model and reasoning effort at submission time. Omit sessionId for a new task; pass it to continue the same Codex thread while the global model configuration is unchanged. Reuse idempotencyKey only when retrying identical parameters, including sandboxMode.',
     inputSchema: submitSchema, outputSchema,
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
   }, input => respond(() => service.submit(input, transport)));

@@ -45,6 +45,34 @@ it('loads the development environment with its existing history and invocation l
   expect(config.queueTimeoutSeconds).toBe(1800);
   expect(config.consoleAuth).toEqual({ username: 'admin', password: 'admin' });
   expect(config.maxConcurrent).toBe(parse(await readFile('config/development.yaml', 'utf8')).tasks.maxConcurrent);
+  expect(config.activeProvider).toBe('openai');
+  expect(config.modelProviders?.map(provider => provider.id)).toEqual(['openai', 'model_studio']);
+  expect(config.modelProviders?.[1]).toMatchObject({ envKey: 'DASHSCOPE_API_KEY', defaultModel: 'qwen3.7-max' });
+  expect(config.modelProviders?.[0]?.models).toContain('gpt-6-sol');
+  expect(config.modelProviders?.[0]?.defaultModel).toBe('gpt-6-sol');
+  expect(config.defaultReasoningEffort).toBe('high');
+  expect(config.modelProviders?.[1]?.models).toContain('qwen3.7-plus');
+});
+
+it('validates configured model providers and never accepts a credential value in place of an environment variable name', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'relay-providers-'));
+  try {
+    const file = join(dir, 'config.yaml');
+    const base = { codex: { defaultWorkingDirectory: '.', activeProvider: 'openai', envAllowlist: ['DASHSCOPE_API_KEY'],
+      providers: [{ id: 'openai', label: 'OpenAI' }, { id: 'model_studio', label: 'Model Studio',
+        baseUrl: 'https://dashscope.example.test/compatible-mode/v1', envKey: 'DASHSCOPE_API_KEY', defaultModel: 'qwen-test' }] } };
+    await writeFile(file, stringify(base));
+    expect((await loadConfig(file)).modelProviders?.[1]).toMatchObject({ id: 'model_studio', envKey: 'DASHSCOPE_API_KEY' });
+    for (const override of [
+      { activeProvider: 'missing' },
+      { providers: [base.codex.providers[0], { ...base.codex.providers[1], baseUrl: 'http://untrusted.example.test/v1' }] },
+      { providers: [base.codex.providers[0], { ...base.codex.providers[1], envKey: 'secret-value!' }] },
+      { providers: [{ ...base.codex.providers[0], models: ['same', 'same'] }, base.codex.providers[1]] },
+    ]) {
+      await writeFile(file, stringify({ ...base, codex: { ...base.codex, ...override } }));
+      await expect(loadConfig(file)).rejects.toThrow();
+    }
+  } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
 it('requires separate production paths and credentials', async () => {
