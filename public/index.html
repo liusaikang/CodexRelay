@@ -89,7 +89,7 @@
       <section class="workspace">
         <form id="task-lookup" class="lookup"><div class="field"><label for="lookup-id">任务或会话 ID</label><input id="lookup-id" class="mono" placeholder="task_… / sess_…" maxlength="64"></div><button type="submit" title="定位记录" aria-label="定位记录"><i data-lucide="search"></i>查询</button></form>
         <div class="section-heading conversation-heading"><div class="row"><h2>会话记录</h2><span id="conversation-count" class="muted">尚未选择</span></div><div class="row"><label class="row" style="margin:0"><input id="auto-refresh" type="checkbox" checked style="width:16px;height:16px">自动刷新</label><button id="refresh-conversation" type="button" class="icon" title="刷新会话记录" aria-label="刷新会话记录" disabled><i data-lucide="refresh-cw"></i></button></div></div>
-        <dl class="meta"><dt>会话</dt><dd id="active-session" class="mono">—</dd><dt>工作目录</dt><dd id="active-directory" class="mono">—</dd></dl>
+        <dl class="meta"><dt>会话</dt><dd id="active-session" class="mono">—</dd><dt>工作目录</dt><dd id="active-directory" class="mono">—</dd><dt>模型</dt><dd id="active-model">—</dd><dt>推理强度</dt><dd id="active-effort">—</dd></dl>
         <div class="conversation-scope">记录范围：当前服务实例已接受的任务。未查到记录不能证明请求未到达；鉴权拒绝、参数错误等不在此列表。</div>
         <div id="conversation-scroll" class="conversation-scroll" tabindex="0" aria-label="多轮会话记录"><div id="conversation-empty" class="conversation-empty">请选择会话或查询任务 ID</div><div id="turns"></div><button id="load-older" type="button" class="hidden"><i data-lucide="history"></i>加载更早记录</button></div>
       </section>
@@ -340,7 +340,7 @@
       viewEpoch++; refreshEpoch = null; selectedSession = ''; turnRows.clear(); historyOffset = 0; totalTurns = 0;
       collapsedTurns.clear();
       $('session').value = '';
-      $('turns').replaceChildren(); $('active-session').textContent = '—'; $('active-directory').textContent = '—';
+      $('turns').replaceChildren(); $('active-session').textContent = '—'; $('active-directory').textContent = '—'; $('active-model').textContent = '—'; $('active-effort').textContent = '—';
       $('conversation-count').textContent = '尚未选择'; $('conversation-empty').textContent = '请选择会话或查询任务 ID'; $('conversation-empty').classList.remove('hidden');
       $('load-older').classList.add('hidden'); $('refresh-conversation').disabled = true;
       markSession();
@@ -352,6 +352,11 @@
     const elapsed = (start, end) => start ? Math.max(0,(Date.parse(end || new Date().toISOString()) - Date.parse(start)) / 1000).toFixed(1) + ' s' : '—';
     function renderConversation({older = false, latest = false, focusId} = {}) {
       const scroller = $('conversation-scroll'), top = scroller.scrollTop;
+      const pageTop = window.scrollY, nestedScroll = new Map();
+      for (const article of $('turns').children) {
+        const panes = [...article.querySelectorAll('details pre.json')];
+        if (panes.length) nestedScroll.set(article.dataset.taskId,panes.map(node => ({top:node.scrollTop,left:node.scrollLeft})));
+      }
       const atTop = top < 50;
       const expanded = new Set([...$('turns').querySelectorAll('details[open]')].map(node => node.dataset.taskId));
       $('turns').replaceChildren();
@@ -383,7 +388,7 @@
         } else {
           const usage = item.result?.usage, progress = item.progress || [], lastEvent = progress.at(-1);
           const times = element('dl','turn-times');
-          for (const [label,value] of [['接收时间',formatTime(item.createdAt)],['开始时间',formatTime(item.startedAt)],['结束时间',formatTime(item.finishedAt)],['排队耗时',elapsed(item.createdAt,item.startedAt || item.finishedAt)],['执行耗时',elapsed(item.startedAt,item.finishedAt)],['Token 用量',usage ? ((usage.input_tokens ?? 0)+(usage.output_tokens ?? 0)).toLocaleString() : '未报告'],['最近执行事件',lastEvent ? formatTime(lastEvent.at) : '无事件记录'],['距最近事件',lastEvent ? elapsed(lastEvent.at,item.finishedAt) : '—']]) {
+          for (const [label,value] of [['接收时间',formatTime(item.createdAt)],['开始时间',formatTime(item.startedAt)],['结束时间',formatTime(item.finishedAt)],['排队耗时',elapsed(item.createdAt,item.startedAt || item.finishedAt)],['执行耗时',elapsed(item.startedAt,item.finishedAt)],['执行上限',item.timeoutSeconds ? item.timeoutSeconds + ' s' : '未记录'],['Token 用量',usage ? ((usage.input_tokens ?? 0)+(usage.output_tokens ?? 0)).toLocaleString() : '未报告'],['最近执行事件',lastEvent ? formatTime(lastEvent.at) : '无事件记录'],['距最近事件',lastEvent ? elapsed(lastEvent.at,item.finishedAt) : '—']]) {
             const pair = element('div'); pair.append(element('dt','',label),element('dd','',value)); times.append(pair);
           }
           body.append(times);
@@ -454,6 +459,12 @@
         article.append(body);
         $('turns').append(article);
       }
+      for (const article of $('turns').children) {
+        const positions = nestedScroll.get(article.dataset.taskId);
+        if (positions) [...article.querySelectorAll('details pre.json')].forEach((node,index) => {
+          if (positions[index]) { node.scrollTop = positions[index].top; node.scrollLeft = positions[index].left; }
+        });
+      }
       $('conversation-count').textContent = `已加载 ${turnRows.size} / 共 ${totalTurns} 轮`;
       $('conversation-empty').classList.toggle('hidden',turnRows.size > 0);
       $('conversation-empty').textContent = '该会话暂无任务记录';
@@ -464,6 +475,7 @@
       } else if (older) scroller.scrollTop = top;
       else if (latest || atTop) scroller.scrollTop = 0;
       else scroller.scrollTop = top;
+      if (!focusId && !latest) window.scrollTo(window.scrollX,pageTop);
       $('last-updated').textContent = '最近同步 ' + new Date().toLocaleTimeString('zh-CN',{hour12:false});
     }
     async function readTurnDetails(entries, epoch, force = false) {
@@ -499,6 +511,7 @@
         }
         totalTurns = total;
         $('active-directory').textContent = peek.workingDirectory || '—';
+        $('active-model').textContent = peek.model || '—'; $('active-effort').textContent = peek.modelReasoningEffort || '—';
         if (!initial && !older) for (const old of turnRows.values()) {
           if ((old.error || !terminal(old.data || old.summary)) && !entries.some(row => row.summary.taskId === old.summary.taskId)) entries.push({summary:old.summary,ordinal:old.ordinal});
         }

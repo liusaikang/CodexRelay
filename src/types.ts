@@ -27,7 +27,11 @@ export const taskListSchema = z.object({
   keyword: z.string().max(200).default(''),
 }).strict();
 export const retrySchema = z.object({ idempotencyKey: z.string().min(1).max(128) }).strict();
-export const progressSchema = z.object({ at: z.string(), kind: z.string(), detail: z.string() });
+export const progressSchema = z.object({
+  at: z.string(), kind: z.string(), detail: z.string(),
+  state: z.enum(['started', 'completed', 'failed']).optional(),
+  durationMs: z.number().int().nonnegative().optional(),
+});
 export const resultSchema = z.object({ markdown: z.string(), usage: z.record(z.string(), z.number()).nullable() });
 // Legacy routing fields are accepted only from persisted records, never from submissions.
 const storedRequestSchema = submitSchema.extend({
@@ -39,6 +43,7 @@ export const taskSchema = z.object({
   request: storedRequestSchema, requestHash: z.string(), configHash: z.string(),
   sandboxMode: sandboxModeSchema.optional(),
   status: statusSchema, createdAt: z.string(), startedAt: z.string().optional(), finishedAt: z.string().optional(),
+  timeoutSeconds: z.number().int().positive().optional(),
   enqueueSequence: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
   queueExpiresAt: z.string().datetime().optional(),
   dependsOnTaskId: idSchema.optional(), dependencyApprovedAt: z.string().datetime().optional(),
@@ -80,7 +85,8 @@ export interface Execution {
   providerId?: string; providerBaseUrl?: string; providerEnvKey?: string;
   env: Record<string, string>;
 }
-export type RunEvent = { kind: 'thread'; threadId: string } | { kind: 'progress'; detail: string };
+export type RunEvent = { kind: 'thread'; threadId: string }
+  | { kind: 'progress'; detail: string; state?: 'started' | 'completed' | 'failed'; durationMs?: number };
 export interface Runner {
   // Must settle only after the execution process has exited, including on cancellation.
   run(execution: Execution, signal: AbortSignal, onEvent: (event: RunEvent) => Promise<void>): Promise<RunResult>;

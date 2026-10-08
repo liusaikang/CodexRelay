@@ -105,9 +105,20 @@ try {
   await page.clock.install();
   await page.getByLabel('自动刷新', {exact:true}).uncheck();
   await page.getByLabel('自动刷新', {exact:true}).check();
-  rows[24] = { ...task(25), status: 'running', finishedAt: undefined, result: undefined, progress: [{ at: new Date().toISOString(), kind: 'progress', detail: 'command_execution' }] };
+  rows[24] = { ...task(25), status: 'running', finishedAt: undefined, result: undefined, timeoutSeconds: 600,
+    progress: Array.from({ length: 50 }, (_, i) => ({ at: new Date().toISOString(), kind: 'progress', detail: 'command_execution', state: i === 49 ? 'started' : 'completed', durationMs: 120 })) };
   await page.clock.runFor(5100);
   await expect(page.locator('#turns article').first()).toContainText('执行中');
+  await expect(page.locator('#turns article').first()).toContainText('600 s');
+  await expect(page.locator('.turn-activity')).toHaveCount(0);
+  await page.locator('#turns article').first().locator('summary').click();
+  const responseJson = page.locator('#turns article').first().locator('pre.json').nth(1);
+  const innerTop = await responseJson.evaluate(node => { node.scrollTop = node.scrollHeight; return node.scrollTop; });
+  assert.ok(innerTop > 0);
+  rows[24].progress.push({ at: new Date().toISOString(), kind: 'progress', detail: 'command_execution', state: 'completed', durationMs: 210 });
+  await page.clock.runFor(5100);
+  await expect(page.locator('#turns article').first()).toContainText('执行中');
+  assert.ok((await page.locator('#turns article').first().locator('pre.json').nth(1).evaluate(node => node.scrollTop)) > 0);
   rows[24] = { ...task(25), result: { markdown: '<script>danger()</script> 最新回答', usage: null } };
   await page.getByRole('button', { name: '刷新会话记录', exact: true }).click();
   await expect(page.locator('#turns article').first()).toContainText('最新回答');

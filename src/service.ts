@@ -270,7 +270,7 @@ export class TaskService {
       if (this.blocker(task)) continue;
       if (this.closing || this.fault) break;
       if (await this.expireQueuedTask(task)) continue;
-      const starting: Task = { ...task, status: 'running', startedAt: now() };
+      const starting: Task = { ...task, status: 'running', startedAt: now(), timeoutSeconds: this.config.timeoutSeconds };
       await this.saveTask(starting);
       // Persistence may be slow; do not launch work that expired or was stopped during the write.
       if (this.closing) { await this.saveTask(task); break; }
@@ -307,7 +307,7 @@ export class TaskService {
           await this.persist(() => this.store.saveTask(task));
         }
       }).catch(() => {});
-    }, this.config.timeoutSeconds * 1000);
+    }, (task.timeoutSeconds ?? this.config.timeoutSeconds) * 1000);
     try {
       const result = await this.runner.run(this.execution(task), controller.signal, event => this.exclusive(async () => {
         if (this.fault) throw new Error('Storage unavailable');
@@ -317,7 +317,9 @@ export class TaskService {
           session.threadId = event.threadId;
           await this.persist(() => this.store.saveSession(session));
         } else {
-          task.progress.push({ at: now(), kind: event.kind, detail: event.detail.slice(0, 200) });
+          task.progress.push({ at: now(), kind: event.kind, detail: event.detail.slice(0, 200),
+            ...(event.state ? { state: event.state } : {}),
+            ...(event.durationMs === undefined ? {} : { durationMs: event.durationMs }) });
           task.progress = task.progress.slice(-100);
           await this.persist(() => this.store.saveTask(task));
         }
@@ -333,8 +335,12 @@ export class TaskService {
       await this.exclusive(async () => {
         if (this.fault) return;
         const finished: Task = { ...task, status: task.stopReason ?? 'failed', finishedAt: now() };
-        finished.error = { code: task.stopReason?.toUpperCase() ?? (error instanceof AppError ? error.code : 'EXECUTION_FAILED'),
-          message: task.stopReason ? `Task ${task.stopReason}.` : 'Codex execution failed. Check service diagnostics and model authentication; submit a follow-up when resolved.' };
+        const code = task.stopReason?.toUpperCase() ?? (error instanceof AppError ? error.code : 'EXECUTION_FAILED');
+        finished.error = { code,
+          message: task.stopReason ? `Task ${task.stopReason}.`
+            : code === 'MODEL_CREDENTIAL_MISSING'
+              ? 'Model provider credential is not configured in the service process. Set the provider API key and restart the service.'
+              : 'Codex execution failed. Check service diagnostics and model authentication; submit a follow-up when resolved.' };
         // Deliberately omit arbitrary CLI stderr, which can contain credentials or source data.
         console.error(JSON.stringify({ taskId: task.taskId, code: finished.error.code }));
         await this.saveTask(finished);

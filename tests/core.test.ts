@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { FileStore } from '../src/storage.js';
 import { TaskService } from '../src/service.js';
-import type { Execution, Runner, RuntimeConfig } from '../src/types.js';
+import { AppError, type Execution, type Runner, type RuntimeConfig } from '../src/types.js';
 
 const cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const fn of cleanup.splice(0).reverse()) await fn(); });
@@ -16,11 +16,11 @@ async function until(fn: () => boolean) {
 }
 
 class ControlledRunner implements Runner {
-  calls: Array<{ execution: Execution; finish: () => void }> = [];
+  calls: Array<{ execution: Execution; finish: () => void; fail: (error: Error) => void; report: Parameters<Runner['run']>[2] }> = [];
   async run(execution: Execution, signal: AbortSignal, onEvent: Parameters<Runner['run']>[2]) {
     await onEvent({ kind: 'thread', threadId: execution.threadId ?? `thread-${this.calls.length}` });
     return new Promise<{ markdown: string; usage: null }>((resolve, reject) => {
-      this.calls.push({ execution, finish: () => resolve({ markdown: 'Verified result', usage: null }) });
+      this.calls.push({ execution, finish: () => resolve({ markdown: 'Verified result', usage: null }), fail: reject, report: onEvent });
       signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
       if (signal.aborted) reject(new Error('aborted'));
     });
@@ -46,6 +46,29 @@ async function fixture(maxConcurrent = 2, maxQueued = 2, timeoutSeconds = 30) {
 const input = { question: 'Why is this failing?' };
 
 describe('durable task scheduling', () => {
+  it('returns a specific safe error when the model credential is missing', async () => {
+    const { service, runner } = await fixture(1);
+    const submitted = await service.submit(input);
+    await until(() => runner.calls.length === 1);
+    runner.calls[0]!.fail(new AppError('MODEL_CREDENTIAL_MISSING', 'private credential detail'));
+    await until(() => service.getTask(submitted.taskId).status === 'failed');
+    expect(service.getTask(submitted.taskId).error).toEqual({
+      code: 'MODEL_CREDENTIAL_MISSING',
+      message: 'Model provider credential is not configured in the service process. Set the provider API key and restart the service.',
+    });
+  });
+  it('persists the execution deadline and safe step metadata with running tasks', async () => {
+    const { service, runner } = await fixture(1, 2, 5);
+    const submitted = await service.submit(input);
+    await until(() => runner.calls.length === 1);
+    expect(service.getTask(submitted.taskId).timeoutSeconds).toBe(5);
+    await runner.calls[0]!.report({ kind: 'progress', detail: 'command_execution', state: 'completed', durationMs: 120 });
+    expect(service.getTask(submitted.taskId).progress).toContainEqual(expect.objectContaining({
+      kind: 'progress', detail: 'command_execution', state: 'completed', durationMs: 120,
+    }));
+    runner.calls[0]!.finish();
+    await until(() => service.getTask(submitted.taskId).status === 'succeeded');
+  });
   it('pins each task sandbox across queuing and restart while preserving old session hashes', async () => {
     const { service, runner, config, dir } = await fixture(1);
     const first = await service.submit(input);
