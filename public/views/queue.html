@@ -1,0 +1,21 @@
+<section id="queue-view" class="view hidden">
+    <main class="queue-shell">
+      <div class="page-heading"><h2>任务队列</h2><button id="queue-refresh" title="刷新任务队列"><i data-lucide="refresh-cw"></i>刷新</button></div>
+      <div class="queue-metrics" aria-label="队列容量">
+        <div><span class="muted">运行中 / 并发上限</span><strong id="queue-running">—</strong><progress id="queue-running-bar" value="0" max="1" aria-label="并发使用量"></progress></div>
+        <div><span class="muted">排队中 / 等待容量</span><strong id="queue-waiting">—</strong><progress id="queue-waiting-bar" value="0" max="1" aria-label="队列使用量"></progress></div>
+        <div><span class="muted">前序失败待确认</span><strong id="queue-blocked">—</strong></div>
+        <div><span class="muted">接收中</span><strong id="queue-receiving">—</strong></div>
+      </div>
+      <form id="queue-filter" class="queue-toolbar">
+        <div class="field"><label for="queue-status">任务状态</label><select id="queue-status"><option value="active">运行中与排队中</option><option value="all">全部任务</option><option value="running">运行中</option><option value="queued">排队中</option><option value="failed">失败</option><option value="timed_out">超时</option><option value="interrupted">中断</option><option value="cancelled">取消</option><option value="succeeded">成功</option></select></div>
+        <div class="field"><label for="queue-keyword">问题 / 任务 ID / 会话 ID</label><input id="queue-keyword" maxlength="200" type="search"></div>
+        <button type="submit" title="筛选任务"><i data-lucide="search"></i>查询</button>
+        <label class="row"><input id="queue-auto" type="checkbox" checked style="width:16px;height:16px">自动刷新队列</label>
+      </form>
+      <div id="queue-message" class="message hidden" role="status"></div>
+      <div class="queue-table-wrap"><table class="queue-table"><thead><tr><th>任务与问题</th><th>状态</th><th>等待原因 / 入队序号</th><th>接收 / 等待 / 执行</th><th>操作</th></tr></thead><tbody id="queue-rows"></tbody></table></div>
+      <div class="queue-pagination"><span id="queue-total" class="muted">尚未读取</span><div class="row"><button id="queue-prev" class="icon" title="上一页" aria-label="队列上一页"><i data-lucide="chevron-left"></i></button><button id="queue-next" class="icon" title="下一页" aria-label="队列下一页"><i data-lucide="chevron-right"></i></button></div></div>
+      <p id="queue-updated" class="queue-note">尚未同步</p>
+    </main>
+  </section>

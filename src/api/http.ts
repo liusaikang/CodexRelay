@@ -23,6 +23,7 @@ export function createHttpApp(service: TaskService, token: string, accountStatus
   const secureCookie = !['127.0.0.1', '::1'].includes(service.config.host);
   const cookieOptions = `Path=/; HttpOnly; SameSite=Strict${secureCookie ? '; Secure' : ''}`;
   const credentials = service.config.consoleAuth;
+  const consoleViews = new Set(['account', 'task', 'queue', 'schedules', 'skills', 'logs', 'settings']);
   const skillExplorer = new SkillExplorer(service.config.defaultWorkingDirectory);
   const sessionId = (req: express.Request) => req.get('cookie')?.split(';').map(part => part.trim())
     .find(part => part.startsWith(`${cookieName}=`))?.slice(cookieName.length + 1);
@@ -70,6 +71,24 @@ export function createHttpApp(service: TaskService, token: string, accountStatus
     if (req.method === 'GET' && (req.path === '/' || req.path === '/console')) {
       if (!consoleSession(req)) { res.redirect('/login'); return; }
       res.sendFile(fileURLToPath(new URL('../../public/index.html', import.meta.url))); return;
+    }
+    if (req.method === 'GET' && req.path.startsWith('/views/')) {
+      if (!consoleSession(req)) { res.status(401).end(); return; }
+      const name = req.path.slice('/views/'.length);
+      if (!name.endsWith('.html') || !consoleViews.has(name.slice(0, -5))) { res.status(404).end(); return; }
+      res.type('html').sendFile(fileURLToPath(new URL(`../../public/views/${name}`, import.meta.url))); return;
+    }
+    if (req.method === 'GET' && req.path === '/assets/app.js') {
+      if (!consoleSession(req)) { res.status(401).end(); return; }
+      res.type('text/javascript').sendFile(fileURLToPath(new URL('../../public/app.js', import.meta.url))); return;
+    }
+    if (req.method === 'GET' && req.path === '/assets/app.css') {
+      if (!consoleSession(req)) { res.status(401).end(); return; }
+      res.type('text/css').sendFile(fileURLToPath(new URL('../../public/app.css', import.meta.url))); return;
+    }
+    if (req.method === 'GET' && (req.path === '/assets/account.js' || req.path === '/assets/task.js')) {
+      if (!consoleSession(req)) { res.status(401).end(); return; }
+      res.type('text/javascript').sendFile(fileURLToPath(new URL(`../../public/${req.path.slice('/assets/'.length)}`, import.meta.url))); return;
     }
     if (req.method === 'GET' && req.path === '/assets/lucide.js') {
       if (!consoleSession(req)) { res.status(401).end(); return; }

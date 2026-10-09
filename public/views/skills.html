@@ -1,0 +1,10 @@
+<section id="skills-view" class="view hidden">
+    <main class="skills-shell">
+      <div class="skills-heading"><div><h2>项目 Skills</h2><p id="skills-workspace">正在读取工作目录</p></div><button id="skills-refresh" type="button" title="重新读取目录"><i data-lucide="refresh-cw"></i>刷新</button></div>
+      <div id="skills-message" class="message hidden" role="status"></div>
+      <div class="skills-layout">
+        <aside class="skills-sidebar" aria-label="项目 Skill 文件树"><div class="skills-sidebar-title">工作目录</div><div id="skills-tree" class="skills-tree"></div></aside>
+        <section class="skills-preview" aria-label="文件预览"><div class="skills-file-head"><div><h3 id="skills-file-name">选择文件</h3><div id="skills-file-path" class="skills-file-path">从左侧展开目录并选择文件</div></div><div class="row"><div id="skills-mode" class="skills-mode hidden" role="group" aria-label="文件显示方式"><button type="button" data-mode="preview" aria-pressed="false">预览</button><button type="button" data-mode="source" aria-pressed="false">源码</button></div><label id="skills-wrap-control" class="row" style="margin:0"><input id="skills-wrap" type="checkbox" style="width:16px;height:16px">自动换行</label><button id="skills-copy" type="button" class="icon" title="复制文件内容" aria-label="复制文件内容" disabled><i data-lucide="copy"></i></button></div></div><div id="skills-meta" class="skills-meta"></div><div id="skills-empty" class="skills-empty">请选择左侧文件</div><article id="skills-rendered" class="skills-rendered hidden" aria-label="Markdown 预览"></article><pre id="skills-content" class="skills-content hidden"><code></code></pre></section>
+      </div>
+    </main>
+  </section>

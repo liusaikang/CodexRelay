@@ -217,6 +217,10 @@ it('requires a console login, keeps the service token out of browser responses, 
   expect(loginPage.status).toBe(200);
   expect(await loginPage.text()).toContain('登录');
   expect((await fetch(`${base}/assets/invocations.js`)).status).toBe(401);
+  expect((await fetch(`${base}/assets/task.js`)).status).toBe(401);
+  expect((await fetch(`${base}/assets/account.js`)).status).toBe(401);
+  expect((await fetch(`${base}/assets/app.css`)).status).toBe(401);
+  expect((await fetch(`${base}/views/task.html`)).status).toBe(401);
   expect((await fetch(`${base}/console/session`)).status).toBe(401);
   const login = async (password: string) => fetch(`${base}/console/login`, {
     method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base },
@@ -240,11 +244,22 @@ it('requires a console login, keeps the service token out of browser responses, 
   const html = await consolePage.text();
   expect(html).toContain('CodexRelay');
   expect(html).toContain('账号额度');
+  expect(html).not.toContain('id="task-form"');
   expect(html).not.toContain(token);
+  for (const view of ['account','task','queue','schedules','skills','logs','settings']) {
+    const fragment = await fetch(`${base}/views/${view}.html`, { headers: consoleHeaders });
+    expect(fragment.status).toBe(200);
+    expect(fragment.headers.get('content-type')).toContain('text/html');
+    expect(await fragment.text()).toContain(`id="${view}-view"`);
+  }
+  expect((await fetch(`${base}/views/unknown.html`, { headers: consoleHeaders })).status).toBe(404);
   const logScript = await fetch(`${base}/assets/invocations.js`, { headers: consoleHeaders });
   expect(logScript.status).toBe(200);
   expect(logScript.headers.get('content-type')).toContain('javascript');
   expect(await logScript.text()).not.toContain(token);
+  const stylesheet = await fetch(`${base}/assets/app.css`, { headers: consoleHeaders });
+  expect(stylesheet.status).toBe(200);
+  expect(stylesheet.headers.get('content-type')).toContain('text/css');
   const session = await fetch(`${base}/console/session`, { headers: consoleHeaders });
   expect(session.status).toBe(200);
   expect(await session.json()).toMatchObject({ username: 'admin', runner: 'demo' });

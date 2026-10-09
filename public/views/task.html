@@ -1,0 +1,29 @@
+<section id="task-view" class="view hidden">
+    <section class="connection-strip" aria-label="Codex 服务连接">
+      <div class="field"><label for="endpoint">服务地址</label><input id="endpoint" class="mono" readonly></div>
+      <div class="field"><label for="auth-source">认证来源</label><input id="auth-source" value="控制台登录会话" readonly></div>
+      <button type="button" id="reconnect"><i data-lucide="plug-zap"></i>重新连接</button>
+    </section>
+    <section class="ops-health" aria-label="服务调度状态"><span>接收中 <strong id="health-receiving">—</strong></span><span>运行中 <strong id="health-running">—</strong></span><span>排队中 <strong id="health-queued">—</strong></span><span>待确认 <strong id="health-blocked">—</strong></span><span id="health-capacity" class="muted">并发上限 — · 队列上限 —</span><span id="health-updated" class="muted">尚未读取</span><span id="health-error" class="error hidden" role="status"></span></section>
+    <div id="task-message" class="message hidden" role="alert"></div>
+    <main class="task-shell">
+      <aside class="task-sidebar">
+        <form id="task-form" class="compose">
+          <div class="section-heading"><h2>提交问题</h2><span class="eyebrow">POST /v1/tasks</span></div>
+          <div class="field"><label for="question">问题内容</label><textarea id="question" maxlength="32000" placeholder="请描述需要 Codex 分析或处理的问题。" disabled></textarea></div>
+          <div class="field"><label for="context">附加上下文 JSON <span class="optional">· 可选</span></label><textarea id="context" class="mono" maxlength="16384" placeholder='{"subject":{"account":"demo-user"}}' disabled></textarea><div class="field-help">由调用平台提供的结构化参考数据，最大 16 KiB。</div></div>
+          <div class="field"><label for="sandbox-mode">执行权限</label><select id="sandbox-mode" disabled><option value="read-only">read-only · 只读</option><option value="workspace-write">workspace-write · 工作目录可写</option><option value="danger-full-access">danger-full-access · 完整权限</option></select><div class="field-help">本次任务使用的 Codex SDK 原生沙箱模式；每次提交独立生效。</div></div>
+          <div class="field"><label for="session">会话 ID <span class="optional">· 可选</span></label><div class="session-line"><input id="session" class="mono" placeholder="留空创建新会话" disabled><button type="button" id="new-session" class="icon" title="新建会话" aria-label="新建会话" disabled><i data-lucide="plus"></i></button></div></div>
+          <button type="submit" id="submit" class="primary submit" disabled><i data-lucide="send"></i><span id="submit-label">提交任务</span></button>
+        </form>
+        <section class="history"><div class="section-heading"><h2>最近会话</h2><button type="button" id="refresh-sessions" class="icon" title="刷新会话" aria-label="刷新会话" disabled><i data-lucide="refresh-cw"></i></button></div><ul id="sessions" class="history-list"><li class="muted">暂无会话</li></ul><div class="history-paging"><span id="sessions-page" class="muted">共 0 个</span><div class="row"><button id="session-prev" type="button" class="icon" title="上一页会话" aria-label="上一页会话" disabled><i data-lucide="chevron-left"></i></button><button id="session-next" type="button" class="icon" title="下一页会话" aria-label="下一页会话" disabled><i data-lucide="chevron-right"></i></button></div></div></section>
+      </aside>
+      <section class="workspace">
+        <form id="task-lookup" class="lookup"><div class="field"><label for="lookup-id">任务或会话 ID</label><input id="lookup-id" class="mono" placeholder="task_… / sess_…" maxlength="64"></div><button type="submit" title="定位记录" aria-label="定位记录"><i data-lucide="search"></i>查询</button></form>
+        <div class="section-heading conversation-heading"><div class="row"><h2>会话记录</h2><span id="conversation-count" class="muted">尚未选择</span></div><div class="row"><label class="row" style="margin:0"><input id="auto-refresh" type="checkbox" checked style="width:16px;height:16px">自动刷新</label><button id="refresh-conversation" type="button" class="icon" title="刷新会话记录" aria-label="刷新会话记录" disabled><i data-lucide="refresh-cw"></i></button></div></div>
+        <dl class="meta"><dt>会话</dt><dd id="active-session" class="mono">—</dd><dt>工作目录</dt><dd id="active-directory" class="mono">—</dd><dt>模型</dt><dd id="active-model">—</dd><dt>推理强度</dt><dd id="active-effort">—</dd></dl>
+        <div class="conversation-scope">记录范围：当前服务实例已接受的任务。未查到记录不能证明请求未到达；鉴权拒绝、参数错误等不在此列表。</div>
+        <div id="conversation-scroll" class="conversation-scroll" tabindex="0" aria-label="多轮会话记录"><div id="conversation-empty" class="conversation-empty">请选择会话或查询任务 ID</div><div id="turns"></div><button id="load-older" type="button" class="hidden"><i data-lucide="history"></i>加载更早记录</button></div>
+      </section>
+    </main>
+  </section>

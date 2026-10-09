@@ -1,0 +1,14 @@
+<section id="account-view" class="view">
+    <main class="account-shell">
+      <div class="page-heading"><div><h2>当前 Codex 账号</h2><p>查看服务使用的登录账号和实时剩余额度。</p></div><div class="account-actions"><button type="button" id="start-codex-login" class="primary hidden"><i data-lucide="log-in"></i>登录 Codex</button><button type="button" id="refresh-account" disabled><i data-lucide="refresh-cw"></i>刷新</button></div></div>
+      <section class="account-panel">
+        <div class="identity"><div class="avatar"><i data-lucide="user-round"></i></div><div><div class="account"><span id="account">读取中…</span><span id="plan" class="plan hidden"></span></div><div id="login-method" class="account-meta">正在检查 Codex 登录状态</div></div></div>
+        <div id="codex-login-flow" class="login-flow hidden"><h3>完成设备授权</h3><p>在打开的官方页面登录，并输入以下一次性验证码。</p><strong id="codex-login-code" class="login-code"></strong><div class="login-flow-actions"><a id="codex-login-link" target="_blank" rel="noopener noreferrer"><i data-lucide="external-link"></i>打开登录页面</a><button type="button" id="copy-codex-code" title="复制验证码"><i data-lucide="copy"></i>复制验证码</button><button type="button" id="cancel-codex-login">取消</button></div></div>
+        <p id="codex-login-feedback" class="login-feedback hidden" role="status" aria-live="polite"></p>
+        <div class="quota"><div class="quota-title"><span>主要额度窗口</span><strong id="remaining">—</strong></div><div class="track" role="progressbar" aria-label="主要额度剩余" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="remaining-bar" class="bar"></div></div><div class="quota-details"><span id="used">已使用 —</span><span id="reset">重置时间 —</span></div></div>
+        <div id="secondary" class="secondary hidden"><div class="quota-title"><span>次要额度窗口</span><strong id="secondary-remaining">—</strong></div><div class="track" role="progressbar" aria-label="次要额度剩余" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="secondary-bar" class="bar"></div></div><div class="quota-details"><span id="secondary-used">已使用 —</span><span id="secondary-reset">重置时间 —</span></div></div>
+        <div class="facts"><div class="fact"><div class="fact-label">可用重置次数</div><div id="reset-credits" class="fact-value">—</div></div><div class="fact"><div class="fact-label">最近检查</div><div id="checked-at" class="fact-value">—</div></div></div>
+      </section>
+      <div id="account-message" class="message hidden" role="alert"></div>
+    </main>
+  </section>

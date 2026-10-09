@@ -1,0 +1,14 @@
+<section id="schedules-view" class="view hidden">
+    <main class="schedule-shell">
+      <div class="page-heading"><div><h2>定时任务</h2><p>每条规则独享 4 个工作位；等待轮次会在空位出现后自动补位。</p></div><button id="schedules-refresh" type="button"><i data-lucide="refresh-cw"></i>刷新</button></div>
+      <div id="schedules-message" class="message hidden" role="status"></div>
+      <form id="schedule-form" class="schedule-form">
+        <div class="field"><label for="schedule-name">规则名称</label><input id="schedule-name" maxlength="120" required placeholder="例如：商品归类核验"></div>
+        <div class="field"><label for="schedule-interval">执行间隔（分钟）</label><input id="schedule-interval" type="number" min="1" max="10080" value="5" required></div>
+        <button class="primary" type="submit"><i data-lucide="plus"></i>创建规则</button>
+        <div class="field prompt"><label for="schedule-question">每轮任务内容</label><textarea id="schedule-question" maxlength="32000" required placeholder="描述每轮需要 Codex 执行的工作"></textarea></div>
+      </form>
+      <div id="schedule-list" class="schedule-list"></div>
+      <section class="schedule-runs"><h3 id="schedule-runs-title">选择规则查看执行轮次</h3><div class="schedule-table-wrap"><table class="schedule-table"><thead><tr><th>计划时间</th><th>状态</th><th>工作位</th><th>任务</th></tr></thead><tbody id="schedule-runs-body"></tbody></table></div></section>
+    </main>
+  </section>

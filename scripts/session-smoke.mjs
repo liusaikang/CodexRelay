@@ -3,6 +3,12 @@ import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 
 const html = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
+const styles = await readFile(new URL('../public/app.css', import.meta.url), 'utf8');
+const appScript = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
+const accountScript = await readFile(new URL('../public/account.js', import.meta.url), 'utf8');
+const taskScript = await readFile(new URL('../public/task.js', import.meta.url), 'utf8');
+const views = Object.fromEntries(await Promise.all(['account','task'].map(async name =>
+  [`/views/${name}.html`,await readFile(new URL(`../public/views/${name}.html`, import.meta.url), 'utf8')])));
 const icons = await readFile(new URL('../node_modules/lucide/dist/umd/lucide.js', import.meta.url), 'utf8');
 const browser = await chromium.launch({ headless: true, ...(process.env.BROWSER_CHANNEL ? { channel: process.env.BROWSER_CHANNEL } : {}) });
 const sid = n => `sess_00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -31,6 +37,11 @@ try {
     const url = new URL(route.request().url()), path = url.pathname;
     const json = data => route.fulfill({ json: data });
     if (path === '/') return route.fulfill({ contentType: 'text/html; charset=utf-8', body: html });
+    if (path === '/assets/app.css') return route.fulfill({ contentType: 'text/css', body: styles });
+    if (views[path]) return route.fulfill({ contentType: 'text/html; charset=utf-8', body: views[path] });
+    if (path === '/assets/app.js') return route.fulfill({ contentType: 'application/javascript', body: appScript });
+    if (path === '/assets/account.js') return route.fulfill({ contentType: 'application/javascript', body: accountScript });
+    if (path === '/assets/task.js') return route.fulfill({ contentType: 'application/javascript', body: taskScript });
     if (path === '/assets/lucide.js') return route.fulfill({ contentType: 'application/javascript', body: icons });
     if (path === '/console/session') return json({ username: 'admin' });
     assert.ok(route.request().headers().cookie?.includes('codex_console=session-smoke-session'));

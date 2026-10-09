@@ -1,0 +1,25 @@
+<section id="settings-view" class="view hidden">
+    <main class="settings-shell">
+      <div class="settings-heading"><div><h2>运行配置</h2><p class="muted" id="settings-summary">正在读取配置</p></div><div class="settings-meta"><div id="settings-revision">版本 —</div><div id="settings-updated">尚未调整</div></div></div>
+      <div id="settings-message" class="message hidden" role="alert"></div>
+      <form id="settings-form">
+        <section class="settings-section"><h3>即时应用 · 任务调度</h3><div class="settings-grid">
+          <div class="settings-field"><label for="setting-max-concurrent">并发任务数</label><input id="setting-max-concurrent" type="number" min="1" max="64" step="1" required><p class="settings-help">降低上限不会中断正在运行的任务。</p></div>
+          <div class="settings-field"><label for="setting-max-queued">等待队列容量</label><input id="setting-max-queued" type="number" min="0" max="10000" step="1" required></div>
+          <div class="settings-field"><label for="setting-timeout">执行超时（秒）</label><input id="setting-timeout" type="number" min="1" max="86400" step="1" required><p class="settings-help">适用于此后启动的任务。</p></div>
+          <div class="settings-field"><label for="setting-queue-timeout">队列等待期限（秒）</label><input id="setting-queue-timeout" type="number" min="1" max="604800" step="1" required><p class="settings-help">已接收任务的等待期限保持不变。</p></div>
+        </div></section>
+        <section class="settings-section"><h3>即时应用 · 全局模型</h3><div class="settings-grid">
+          <div class="settings-field"><label for="setting-provider">模型供应商</label><select id="setting-provider"></select><p class="settings-help">网页、HTTP 和 MCP 的新任务统一采用此配置。</p></div>
+          <div class="settings-field"><label>请求地址</label><div id="setting-endpoint" class="settings-endpoint">—</div><p id="setting-credential" class="settings-help">—</p></div>
+          <div class="settings-field"><label for="setting-model">模型</label><select id="setting-model"></select><p class="settings-help">已接收任务保持原配置；旧会话切换后需新建会话。</p></div>
+          <div class="settings-field"><label for="setting-effort">推理强度</label><select id="setting-effort"><option value="minimal">minimal</option><option value="low">low</option><option value="medium">medium</option><option value="high">high</option><option value="xhigh">xhigh</option><option value="max">max</option><option value="ultra">ultra</option><option value="persistent">persistent</option></select><p id="setting-effort-help" class="settings-help hidden">qwen3.7-flash 仅支持 low 和 medium。</p></div>
+        </div></section>
+        <section class="settings-section"><h3>专门处理 · 调用日志</h3><div class="settings-grid">
+          <div class="settings-field"><div class="settings-switch"><input id="setting-log-enabled" type="checkbox"><label for="setting-log-enabled">记录新调用</label></div><p class="settings-help" id="settings-log-health">—</p></div>
+          <div class="settings-field"><label for="setting-retention">日志保留天数</label><input id="setting-retention" type="number" min="1" max="3650" step="1" required><p class="settings-help">缩短保留期会清理超期记录。</p></div>
+        </div></section>
+        <div class="settings-actions"><button type="button" id="settings-refresh" title="重新读取配置"><i data-lucide="refresh-cw"></i>刷新</button><button type="button" id="settings-defaults" title="载入基础配置"><i data-lucide="rotate-ccw"></i>恢复基础值</button><button type="button" id="settings-cancel" title="撤销未保存修改">撤销修改</button><span id="settings-feedback" class="settings-feedback" role="status"></span><button type="submit" id="settings-save" class="primary" disabled><i data-lucide="save"></i>保存并应用</button></div>
+      </form>
+    </main>
+  </section>

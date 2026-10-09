@@ -1,0 +1,23 @@
+<section id="logs-view" class="view hidden">
+    <main class="log-shell">
+      <div class="log-heading"><h2>调用日志</h2><button id="logs-refresh" type="button" title="刷新日志" aria-label="刷新日志"><i data-lucide="refresh-cw"></i>刷新</button></div>
+      <div id="logs-message" class="message hidden" role="alert"></div>
+      <dl class="log-metrics">
+        <div><dt>调用总数</dt><dd id="logs-total">—</dd></div><div><dt>已结束任务成功率</dt><dd id="logs-rate">—</dd></div><div><dt>失败 / 超时 / 中断</dt><dd id="logs-failed">—</dd></div><div><dt>平均执行耗时</dt><dd id="logs-duration">—</dd></div><div><dt>已报告 Token 用量</dt><dd id="logs-tokens">—</dd></div>
+      </dl>
+      <form id="logs-filters" class="log-filters">
+        <div><label for="logs-from">起始时间</label><input id="logs-from" type="datetime-local"></div>
+        <div><label for="logs-to">截止时间</label><input id="logs-to" type="datetime-local"></div>
+        <div><label for="logs-status">任务状态</label><select id="logs-status"><option value="">全部状态</option value="queued">排队中</option><option value="running">执行中</option><option value="succeeded">已完成</option><option value="failed">失败</option><option value="timed_out">已超时</option><option value="interrupted">已中断</option><option value="cancelled">已取消</option></select></div>
+        <div><label for="logs-keyword">提示词关键字</label><input id="logs-keyword" type="search" maxlength="200"></div>
+        <button type="submit" class="primary"><i data-lucide="search"></i>查询</button><button type="reset" title="重置筛选" aria-label="重置筛选" class="icon"><i data-lucide="rotate-ccw"></i></button>
+      </form>
+      <div class="log-table-wrap"><table class="log-table"><thead><tr><th>提交时间</th><th>提示词</th><th>结果摘要</th><th>状态 / 来源</th><th>耗时</th><th>Token</th><th>详情</th></tr></thead><tbody id="logs-rows"></tbody></table></div>
+      <div id="logs-empty" class="log-empty">暂无调用记录</div>
+      <div class="log-pagination"><span id="logs-range" class="muted">共 0 条</span><div class="row"><button type="button" id="logs-prev" class="icon" title="上一页" aria-label="上一页" disabled><i data-lucide="chevron-left"></i></button><button type="button" id="logs-next" class="icon" title="下一页" aria-label="下一页" disabled><i data-lucide="chevron-right"></i></button></div></div>
+    </main>
+    <dialog id="logs-detail" class="log-detail" aria-labelledby="logs-detail-title">
+      <div class="log-heading"><h2 id="logs-detail-title">调用详情</h2><button id="logs-close" type="button" class="icon" title="关闭详情" aria-label="关闭详情"><i data-lucide="x"></i></button></div>
+      <dl id="logs-detail-meta" class="meta"></dl><h3>提示词</h3><pre id="logs-detail-question"></pre><h3>附加上下文</h3><pre id="logs-detail-context"></pre><h3>Codex 返回结果</h3><pre id="logs-detail-result"></pre><h3>错误信息</h3><pre id="logs-detail-error"></pre><h3>Token 用量</h3><pre id="logs-detail-usage"></pre>
+    </dialog>
+  </section>

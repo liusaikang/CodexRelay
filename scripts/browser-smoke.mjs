@@ -3,6 +3,12 @@ import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 
 const html = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
+const styles = await readFile(new URL('../public/app.css', import.meta.url), 'utf8');
+const appScript = await readFile(new URL('../public/app.js', import.meta.url), 'utf8');
+const accountScript = await readFile(new URL('../public/account.js', import.meta.url), 'utf8');
+const taskScript = await readFile(new URL('../public/task.js', import.meta.url), 'utf8');
+const views = Object.fromEntries(await Promise.all(['account','task','queue','schedules','skills','logs','settings'].map(async name =>
+  [`/views/${name}.html`,await readFile(new URL(`../public/views/${name}.html`, import.meta.url), 'utf8')])));
 const invocationScript = await readFile(new URL('../public/invocations.js', import.meta.url), 'utf8');
 const settingsScript = await readFile(new URL('../public/settings.js', import.meta.url), 'utf8');
 const schedulesScript = await readFile(new URL('../public/schedules.js', import.meta.url), 'utf8');
@@ -61,6 +67,11 @@ try {
     const path = new URL(request.url()).pathname;
     requests.push(request.method() + ' ' + path);
     if (path === '/') return route.fulfill({ contentType: 'text/html; charset=utf-8', body: html });
+    if (path === '/assets/app.css') return route.fulfill({ contentType: 'text/css', body: styles });
+    if (views[path]) return route.fulfill({ contentType: 'text/html; charset=utf-8', body: views[path] });
+    if (path === '/assets/app.js') return route.fulfill({ contentType: 'application/javascript', body: appScript });
+    if (path === '/assets/account.js') return route.fulfill({ contentType: 'application/javascript', body: accountScript });
+    if (path === '/assets/task.js') return route.fulfill({ contentType: 'application/javascript', body: taskScript });
     if (path === '/assets/lucide.js') return route.fulfill({ contentType: 'application/javascript', body: icons });
     if (path === '/assets/invocations.js') return scriptFail
       ? route.fulfill({ status: 401, json: { error: { code: 'UNAUTHORIZED' } } })
@@ -153,6 +164,9 @@ try {
 
   await page.goto('http://127.0.0.1:8787/');
   await expect(page.locator('#service-label')).toHaveText('已连接');
+  assert.equal(requests.some(request => request.includes('/views/task.html')),false);
+  assert.equal(requests.some(request => request.includes('/assets/task.js')),false);
+  assert.equal(requests.some(request => request.includes('/v1/sessions')),false);
   await expect(page.locator('#account')).toHaveText('o******r@example.com');
   await expect(page.locator('#plan')).toHaveText('pro');
   await expect(page.locator('#remaining')).toHaveText('63% 剩余');
@@ -161,6 +175,7 @@ try {
   await page.getByRole('button', { name: '刷新', exact: true }).click();
   await expect(page.locator('#remaining')).toHaveText('62% 剩余');
   await page.getByRole('button', { name: 'Codex 调用', exact: true }).click();
+  await expect.poll(() => requests.some(request => request.includes('/assets/task.js'))).toBe(true);
   await expect(page.getByLabel('服务地址')).toHaveValue('http://127.0.0.1:8787');
   await expect(page.getByLabel('认证来源')).toHaveValue('控制台登录会话');
   await expect(page.getByRole('button', { name: '重新连接', exact: true })).toBeEnabled();
@@ -281,6 +296,8 @@ try {
   await page.getByRole('button', { name: '刷新日志', exact: true }).click();
   await expect(page.locator('#logs-message')).toHaveText('日志请求失败');
   await page.getByRole('button', { name: '账号额度', exact: true }).click();
+  assert.equal(requests.filter(request => request === 'GET /views/account.html').length,1);
+  assert.equal(requests.filter(request => request === 'GET /views/logs.html').length,1);
   await expect(page.locator('#remaining')).toHaveText('62% 剩余');
   await checkLayout(page);
   assert.ok(requests.includes('POST /v1/tasks'));

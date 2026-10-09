@@ -6,6 +6,12 @@ import assert from 'node:assert/strict';
 const capture = process.argv.includes('--screenshots');
 const root = new URL('../',import.meta.url);
 const html = await readFile(new URL('public/index.html',root),'utf8');
+const styles = await readFile(new URL('public/app.css',root),'utf8');
+const appScript = await readFile(new URL('public/app.js',root),'utf8');
+const accountScript = await readFile(new URL('public/account.js',root),'utf8');
+const taskScript = await readFile(new URL('public/task.js',root),'utf8');
+const views = Object.fromEntries(await Promise.all(['account','task','queue'].map(async name =>
+  [`/views/${name}.html`,await readFile(new URL(`public/views/${name}.html`,root),'utf8')])));
 const script = await readFile(new URL('public/queue.js',root),'utf8');
 const icons = await readFile(new URL('node_modules/lucide/dist/umd/lucide.js',root),'utf8');
 const browser = await chromium.launch({headless:true,...(process.env.BROWSER_CHANNEL ? {channel:process.env.BROWSER_CHANNEL} : {})});
@@ -33,6 +39,11 @@ try {
     const request = route.request(), url = new URL(request.url()), path = url.pathname;
     const json = data => route.fulfill({json:data});
     if (path === '/') return route.fulfill({contentType:'text/html; charset=utf-8',body:html});
+    if (path === '/assets/app.css') return route.fulfill({contentType:'text/css',body:styles});
+    if (views[path]) return route.fulfill({contentType:'text/html; charset=utf-8',body:views[path]});
+    if (path === '/assets/app.js') return route.fulfill({contentType:'application/javascript',body:appScript});
+    if (path === '/assets/account.js') return route.fulfill({contentType:'application/javascript',body:accountScript});
+    if (path === '/assets/task.js') return route.fulfill({contentType:'application/javascript',body:taskScript});
     if (path === '/assets/lucide.js') return route.fulfill({contentType:'application/javascript',body:icons});
     if (path === '/assets/queue.js') return route.fulfill({contentType:'application/javascript',body:script});
     if (path === '/console/session') return json({username:'operator'});
