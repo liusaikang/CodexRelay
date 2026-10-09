@@ -4,7 +4,7 @@ A self-hosted Codex task gateway with MCP tools, HTTP APIs, persistent sessions,
 
 将 Codex 接入你的应用：提交问题后立即获得任务 ID，由服务负责排队、执行、会话续接和结果保存。项目说明与 Skills 由 Codex 原生加载，适合代码分析、日志诊断以及可扩展的运维工作流。
 
-[快速开始](#本地运行) · [登录与额度](docs/codex-auth.md) · [完整接入示例](docs/first-task.md) · [调度机制](docs/scheduling.md) · [运维排障](docs/troubleshooting.md)
+[快速开始](#本地运行) · [登录与额度](docs/codex-auth.md) · [完整接入示例](docs/first-task.md) · [定时任务](docs/scheduled-tasks.md) · [调度机制](docs/scheduling.md) · [运维排障](docs/troubleshooting.md)
 
 ![CodexRelay 产品概览：通过 MCP / HTTP 提交任务，经并发调度与 Codex SDK 执行后获取结果，由统一控制台管理账号额度、任务会话和运行日志。](docs/images/codexrelay-overview.png)
 
@@ -12,6 +12,7 @@ A self-hosted Codex task gateway with MCP tools, HTTP APIs, persistent sessions,
 
 - **接入简单**：`question` 必填，`context`、`sessionId`、`idempotencyKey` 可选。
 - **可控执行**：全局并发、等待容量、排队期限、执行超时，同一会话串行。
+- **持久化定时规则**：每条规则使用 4 个独立工作位和固定会话，按分钟触发；超出并行数的轮次持久化等待，空位出现后自动补位。
 - **保留记录**：任务、会话、运行配置和可选调用日志保存在文件中，无需外部数据库。
 - **全局模型切换**：支持 Codex 内置 OpenAI 模型和阿里云百炼的 Qwen 模型；控制台切换后，网页、HTTP 和 MCP 的新任务统一使用所选供应商与模型，已接收任务保留原配置。
 - **便于运维**：账号额度、会话历史、队列、取消、失败重试、调用日志及配置热更新。

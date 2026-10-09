@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 const html = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
 const invocationScript = await readFile(new URL('../public/invocations.js', import.meta.url), 'utf8');
 const settingsScript = await readFile(new URL('../public/settings.js', import.meta.url), 'utf8');
+const schedulesScript = await readFile(new URL('../public/schedules.js', import.meta.url), 'utf8');
 const icons = await readFile(new URL('../node_modules/lucide/dist/umd/lucide.js', import.meta.url), 'utf8');
 const browser = await chromium.launch({ headless: true, ...(process.env.BROWSER_CHANNEL ? { channel: process.env.BROWSER_CHANNEL } : {}) });
 const errors = [];
@@ -48,6 +49,9 @@ try {
     { id: 'model_studio', label: '阿里云百炼', defaultModel: 'qwen3.7-max', models: ['qwen3.7-max', 'qwen3.7-plus', 'qwen3.7-flash', 'glm-5.3'], baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', credentialConfigured: true },
   ];
   let liveSettings = structuredClone(baseSettings);
+  const scheduleRules = [], scheduledRuns = [];
+  const scheduleId = 'sched_00000000-0000-4000-8000-000000000001';
+  const runId = 'run_00000000-0000-4000-8000-000000000001';
   const logDetail = { taskId, sessionId, transport: 'mcp', question: '<script>window.__injected = true</script> 日志测试', context: { account: 'demo-user' }, status: 'succeeded', receivedAt: '2026-09-24T06:00:00.000Z', startedAt: '2026-09-24T06:00:01.000Z', finishedAt: '2026-09-24T06:00:03.000Z', durationMs: 2000, usage: { input_tokens: 100, output_tokens: 20 }, resultMarkdown: '<img src=x onerror=alert(1)> 完整回答', error: null };
   await context.route('**/*', async route => {
     const request = route.request();
@@ -59,6 +63,7 @@ try {
       ? route.fulfill({ status: 401, json: { error: { code: 'UNAUTHORIZED' } } })
       : route.fulfill({ contentType: 'application/javascript', body: invocationScript });
     if (path === '/assets/settings.js') return route.fulfill({ contentType: 'application/javascript', body: settingsScript });
+    if (path === '/assets/schedules.js') return route.fulfill({ contentType: 'application/javascript', body: schedulesScript });
     if (path === '/console/session') return route.fulfill({ json: { username: 'admin' } });
     if (!request.headers().cookie?.includes('codex_console=browser-smoke-session')) {
       errors.push('Missing fixture console session: ' + path);
@@ -84,6 +89,25 @@ try {
         updatedAt: settingsRevision ? '2026-09-28T09:00:00.000Z' : null,
         updatedBy: settingsRevision ? 'admin' : null, logging: { healthy: true }, providers,
         jobs: { running: 1, queued: 1 } } });
+    }
+    if (path === '/console/schedules') {
+      if (request.method() === 'POST') {
+        const input = request.postDataJSON();
+        scheduleRules.push({ ...input, id: scheduleId, nextRunAt: '2026-09-24T06:05:00.000Z',
+          createdAt: '2026-09-24T06:00:00.000Z', sessions: [null,null,null,null], running: 0, waiting: 0, laneLimit: 4 });
+        return route.fulfill({ status: 201, json: scheduleRules[0] });
+      }
+      return route.fulfill({ json: { items: scheduleRules } });
+    }
+    if (path === `/console/schedules/${scheduleId}/runs`) return route.fulfill({ json: { items: scheduledRuns } });
+    if (path === `/console/schedules/${scheduleId}/run`) {
+      scheduledRuns.push({ id: runId, scheduleId, scheduledAt: '2026-09-24T06:00:01.000Z', state: 'waiting' });
+      scheduleRules[0].waiting = 1;
+      return route.fulfill({ status: 202, json: scheduledRuns[0] });
+    }
+    if (path === `/console/schedules/${scheduleId}/enabled`) {
+      scheduleRules[0].enabled = request.postDataJSON().enabled;
+      return route.fulfill({ json: scheduleRules[0] });
     }
     if (path.startsWith('/v1/admin/invocations')) {
       if (logsFail) return route.fulfill({ status: 503, json: { error: { message: '日志请求失败' } } });
@@ -140,6 +164,17 @@ try {
   assert.equal(submissions[0].question, '分析这个测试问题');
   assert.deepEqual(submissions[0].context, { source: 'browser-smoke' });
   assert.equal(submissions[0].sandboxMode, 'read-only');
+  await checkLayout(page);
+  await page.getByRole('button', { name: '定时任务', exact: true }).click();
+  await expect(page.locator('#schedule-list')).toContainText('暂无定时规则');
+  await page.getByLabel('规则名称').fill('商品核验');
+  await page.getByLabel('每轮任务内容').fill('核验待处理商品');
+  await page.getByRole('button', { name: '创建规则' }).click();
+  await expect(page.locator('#schedule-list')).toContainText('商品核验');
+  await page.getByRole('button', { name: '立即运行' }).click();
+  await expect(page.locator('#schedule-runs-body')).toContainText('等待工作位');
+  await page.getByRole('button', { name: '暂停', exact: true }).click();
+  await expect(page.locator('#schedule-list')).toContainText('已暂停');
   await checkLayout(page);
   await page.getByRole('button', { name: '调用日志', exact: true }).click();
   await expect(page.locator('#logs-total')).toHaveText('21');

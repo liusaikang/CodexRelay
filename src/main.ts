@@ -5,6 +5,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { loadConfig } from './config.js';
 import { FileStore, inspectStoreLock, recoverStoreLock } from './storage.js';
 import { TaskService } from './service.js';
+import { ScheduleService } from './schedules.js';
 import { ProcessRunner } from './runner/process.js';
 import { DemoRunner } from './runner/demo.js';
 import { createHttpApp } from './api/http.js';
@@ -46,12 +47,14 @@ async function main() {
   const accountStatus = accountGateway ? new AccountInspector(accountGateway) : undefined;
   const codexLogin = accountGateway ? new CodexLoginManager(accountGateway, accountStatus) : undefined;
   await service.init();
+  const schedules = values.transport === 'http' ? new ScheduleService(service) : undefined;
   let closeTransport: () => Promise<void> = async () => {};
   let stopping = false;
   const shutdown = async () => {
     if (stopping) return;
     stopping = true;
     // Stop admission before closing listeners; retain queued tasks for next startup.
+    await schedules?.close();
     await service.close();
     codexLogin?.close();
     await accountGateway?.close();
@@ -64,7 +67,8 @@ async function main() {
       closeTransport = () => server.close();
       process.stdin.once('end', () => { void shutdown(); });
     } else {
-      const app = createHttpApp(service, token, accountStatus, codexLogin);
+      await schedules!.init();
+      const app = createHttpApp(service, token, accountStatus, codexLogin, schedules);
       const server = app.listen(config.port, config.host);
       await new Promise<void>((resolve, reject) => { server.once('listening', resolve); server.once('error', reject); });
       closeTransport = () => new Promise<void>((resolve, reject) => {

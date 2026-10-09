@@ -35,6 +35,7 @@
     @media(max-width:900px){header,.quick-nav{padding-left:20px;padding-right:20px}.task-shell{grid-template-columns:320px minmax(0,1fr)}.compose,.history{padding:22px 18px}.workspace{padding:24px 20px}}
     @media(max-width:680px){header{height:66px;padding:0 16px}.subtitle{display:none}h1{font-size:18px}.quick-nav{height:48px;padding:0 12px;gap:8px}.quick-nav button{font-size:12px;gap:4px}.quick-nav button svg{width:14px;height:14px}.view{min-height:calc(100vh - 151px)}.account-shell{margin:28px auto;width:min(100% - 24px,760px)}.page-heading{flex-direction:column;align-items:stretch}.page-heading button{align-self:flex-start}.account-panel{padding:20px}.facts{grid-template-columns:1fr}.fact+.fact{border-left:0;border-top:1px solid var(--line)}.quota-details{flex-direction:column;gap:2px}.connection-strip{grid-template-columns:1fr;padding:16px}.task-shell{display:flex;flex-direction:column}.task-sidebar{border-right:0}.workspace{border-top:1px solid var(--line);padding:22px 16px}.compose,.history{padding:22px 16px}.stats{gap:10px}.detail-tabs{gap:17px}.message{margin:12px 16px 0}footer{padding:14px 16px;flex-direction:column}}
     .queue-shell{max-width:1560px;margin:auto;padding:24px;background:white;min-height:70vh}.queue-toolbar{display:flex;flex-wrap:wrap;align-items:end;gap:16px;margin:22px 0}.queue-toolbar .field{margin:0;flex:1 1 200px}.queue-toolbar select{width:100%;height:40px;font:inherit;border:1px solid var(--line);border-radius:6px;background:white;padding:6px}.queue-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px;border-block:1px solid var(--line);padding:18px 0}.queue-metrics strong{display:block;font-size:22px}.queue-table-wrap{overflow:auto}.queue-table{width:100%;border-collapse:collapse;font-size:12px;text-align:left;min-width:800px}.queue-table th,.queue-table td{padding:12px 10px;border-bottom:1px solid var(--line);vertical-align:top}.queue-table th{color:var(--muted);font-weight:600;background:var(--surface)}.queue-question{max-width:340px;overflow-wrap:anywhere;white-space:pre-wrap}.queue-id{font-size:10px;overflow-wrap:anywhere;max-width:310px;color:var(--muted)}.queue-actions{display:flex;gap:6px}.queue-pagination{display:flex;justify-content:space-between;align-items:center;margin-top:16px}.queue-note{font-size:12px;color:var(--muted)}.queue-shell .message{margin:12px 0}.turn-actions{display:flex;gap:8px;margin-top:12px}@media(max-width:680px){.queue-shell{padding:16px}.queue-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.queue-toolbar{gap:10px}}
+    .schedule-shell{max-width:1240px;margin:auto;padding:26px 24px 60px;background:white;min-height:70vh}.schedule-form{display:grid;grid-template-columns:minmax(160px,1fr) 130px auto;gap:12px;align-items:end;margin:20px 0}.schedule-form .field{margin:0}.schedule-form .prompt{grid-column:1/-1}.schedule-form textarea{min-height:88px}.schedule-list{border-top:1px solid var(--line)}.schedule-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;padding:18px 0;border-bottom:1px solid var(--line)}.schedule-row h3{margin:0;font-size:15px}.schedule-row p{margin:5px 0 0;color:var(--muted);font-size:12px;overflow-wrap:anywhere}.schedule-row .row{flex-wrap:wrap;justify-content:flex-end}.schedule-row[aria-current=true]{border-left:3px solid var(--green);padding-left:10px}.schedule-runs{margin-top:28px}.schedule-runs h3{font-size:15px}.schedule-table-wrap{overflow-x:auto}.schedule-table{width:100%;min-width:670px;border-collapse:collapse;text-align:left;font-size:12px}.schedule-table th,.schedule-table td{padding:10px;border-bottom:1px solid var(--line);vertical-align:top}.schedule-table th{color:var(--muted);background:var(--surface)}.schedule-table button{color:var(--green);border:0;padding:0;min-height:0;background:transparent}.schedule-shell .message{margin:12px 0}@media(max-width:680px){.schedule-shell{padding:20px 16px}.schedule-form{grid-template-columns:1fr}.schedule-form .prompt{grid-column:auto}.schedule-row{grid-template-columns:1fr}.schedule-row .row{justify-content:flex-start}}
   </style>
   <script src="/assets/lucide.js"></script>
 </head>
@@ -47,6 +48,7 @@
     <button type="button" data-view="account-view" aria-current="page"><i data-lucide="gauge"></i>账号额度</button>
     <button type="button" data-view="task-view" aria-current="false"><i data-lucide="messages-square"></i>Codex 调用</button>
     <button type="button" data-view="queue-view" aria-current="false"><i data-lucide="list-ordered"></i>任务队列</button>
+    <button type="button" data-view="schedules-view" aria-current="false"><i data-lucide="calendar-clock"></i>定时任务</button>
     <button type="button" data-view="logs-view" aria-current="false"><i data-lucide="list-filter"></i>调用日志</button>
     <button type="button" data-view="settings-view" aria-current="false"><i data-lucide="sliders-horizontal"></i>运行配置</button>
   </nav>
@@ -164,6 +166,20 @@
       <p id="queue-updated" class="queue-note">尚未同步</p>
     </main>
   </section>
+  <section id="schedules-view" class="view hidden">
+    <main class="schedule-shell">
+      <div class="page-heading"><div><h2>定时任务</h2><p>每条规则独享 4 个工作位；等待轮次会在空位出现后自动补位。</p></div><button id="schedules-refresh" type="button"><i data-lucide="refresh-cw"></i>刷新</button></div>
+      <div id="schedules-message" class="message hidden" role="status"></div>
+      <form id="schedule-form" class="schedule-form">
+        <div class="field"><label for="schedule-name">规则名称</label><input id="schedule-name" maxlength="120" required placeholder="例如：商品归类核验"></div>
+        <div class="field"><label for="schedule-interval">执行间隔（分钟）</label><input id="schedule-interval" type="number" min="1" max="10080" value="5" required></div>
+        <button class="primary" type="submit"><i data-lucide="plus"></i>创建规则</button>
+        <div class="field prompt"><label for="schedule-question">每轮任务内容</label><textarea id="schedule-question" maxlength="32000" required placeholder="描述每轮需要 Codex 执行的工作"></textarea></div>
+      </form>
+      <div id="schedule-list" class="schedule-list"></div>
+      <section class="schedule-runs"><h3 id="schedule-runs-title">选择规则查看执行轮次</h3><div class="schedule-table-wrap"><table class="schedule-table"><thead><tr><th>计划时间</th><th>状态</th><th>工作位</th><th>任务</th></tr></thead><tbody id="schedule-runs-body"></tbody></table></div></section>
+    </main>
+  </section>
   <footer><span>CodexRelay / Codex SDK</span><span id="last-updated">尚未同步</span></footer>
 
   <script type="module">
@@ -195,6 +211,15 @@
     }
     let settingsPanelPromise;
     let queuePanelPromise;
+    let schedulesPanelPromise;
+    async function loadSchedulesPanel() {
+      try {
+        schedulesPanelPromise ??= import('/assets/schedules.js').then(({createSchedulesPanel}) => createSchedulesPanel({api,formatTime,
+          onInspect: async run => { showView('task-view'); await selectSession(run.sessionId,run.taskId); }}));
+        const panel = await schedulesPanelPromise;
+        if (!$('schedules-view').classList.contains('hidden')) panel.show();
+      } catch { schedulesPanelPromise = undefined; message('schedules-message','定时任务面板加载失败，请刷新重试。'); }
+    }
     async function loadQueuePanel() {
       try {
         queuePanelPromise ??= import('/assets/queue.js').then(({createQueuePanel}) => createQueuePanel({api,formatTime,labels,waitingLabels,
@@ -596,7 +621,7 @@
       } finally { $('reconnect').disabled = false; syncTaskControls(); }
     }
     function showView(id) {
-      for (const name of ['account-view','task-view','logs-view','settings-view','queue-view']) $(name).classList.toggle('hidden',name !== id);
+      for (const name of ['account-view','task-view','logs-view','settings-view','queue-view','schedules-view']) $(name).classList.toggle('hidden',name !== id);
       for (const button of document.querySelectorAll('.quick-nav button')) button.setAttribute('aria-current',button.dataset.view === id ? 'page' : 'false');
       if (id === 'task-view') { void ensureTaskConsole(); startMonitor(); }
       else clearTimeout(monitorTimer);
@@ -604,6 +629,8 @@
       if (id === 'settings-view') void loadSettingsPanel();
       if (id === 'queue-view') void loadQueuePanel();
       else if (queuePanelPromise) void queuePanelPromise.then(panel => panel.hide()).catch(() => {});
+      if (id === 'schedules-view') void loadSchedulesPanel();
+      else if (schedulesPanelPromise) void schedulesPanelPromise.then(panel => panel.hide()).catch(() => {});
     }
     $('task-form').onsubmit = async event => {
       event.preventDefault(); if (!taskReady || submitting) return;

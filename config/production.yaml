@@ -15,7 +15,7 @@ server:
   allowedHosts: [localhost, 127.0.0.1, '[::1]', '${CODEX_PUBLIC_HOST}']
   allowedOrigins: ['${CODEX_PUBLIC_ORIGIN}']
 tasks:
-  maxConcurrent: 3
+  maxConcurrent: 4
   maxQueued: 100
   timeoutSeconds: 600
   queueTimeoutSeconds: 1800

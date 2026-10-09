@@ -6,7 +6,7 @@ import { canonicalStoragePath } from './paths.js';
 import { AppError, contextSchema, idSchema, statusSchema, type Task } from './types.js';
 
 export type InvocationConfig = { enabled: boolean; directory: string; retentionDays: number };
-export type InvocationTransport = 'http' | 'mcp' | 'stdio';
+export type InvocationTransport = 'http' | 'mcp' | 'stdio' | 'scheduled';
 export const invocationQuerySchema = z.object({
   from: z.iso.datetime({ offset: true }).optional(), to: z.iso.datetime({ offset: true }).optional(),
   status: statusSchema.optional(), keyword: z.string().trim().max(200).optional(),
@@ -15,7 +15,7 @@ export const invocationQuerySchema = z.object({
 type Query = z.infer<typeof invocationQuerySchema>;
 const recordSchema = z.object({
   version: z.literal(1), taskId: idSchema, sessionId: idSchema,
-  transport: z.enum(['http', 'mcp', 'stdio']), question: z.string(), context: contextSchema.optional(),
+  transport: z.enum(['http', 'mcp', 'stdio', 'scheduled']), question: z.string(), context: contextSchema.optional(),
   status: statusSchema, receivedAt: z.iso.datetime({ offset: true }),
   startedAt: z.iso.datetime({ offset: true }).optional(), finishedAt: z.iso.datetime({ offset: true }).optional(),
   durationMs: z.number().nonnegative().nullable(), usage: z.record(z.string(), z.number()).nullable(),

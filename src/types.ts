@@ -48,7 +48,7 @@ export const taskSchema = z.object({
   queueExpiresAt: z.string().datetime().optional(),
   dependsOnTaskId: idSchema.optional(), dependencyApprovedAt: z.string().datetime().optional(),
   retryOfTaskId: idSchema.optional(),
-  invocationTransport: z.enum(['http', 'mcp', 'stdio']).optional(),
+  invocationTransport: z.enum(['http', 'mcp', 'stdio', 'scheduled']).optional(),
   stopReason: z.enum(['cancelled', 'timed_out', 'interrupted']).optional(),
   error: z.object({ code: z.string(), message: z.string() }).optional(),
   result: resultSchema.optional(), progress: z.array(progressSchema),

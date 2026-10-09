@@ -8,8 +8,9 @@ import { TaskService } from '../service.js';
 import { AppError, idSchema, pageSchema, retrySchema } from '../types.js';
 import type { AccountStatusProvider, CodexLoginProvider } from '../account.js';
 import { invocationQuerySchema } from '../invocations.js';
+import { ScheduleService } from '../schedules.js';
 
-export function createHttpApp(service: TaskService, token: string, accountStatus?: AccountStatusProvider, codexLogin?: CodexLoginProvider) {
+export function createHttpApp(service: TaskService, token: string, accountStatus?: AccountStatusProvider, codexLogin?: CodexLoginProvider, schedules?: ScheduleService) {
   if (token.length < 24) throw new Error('Service token must be at least 24 characters');
   const app = express();
   app.disable('x-powered-by');
@@ -84,6 +85,10 @@ export function createHttpApp(service: TaskService, token: string, accountStatus
       if (!consoleSession(req)) { res.status(401).end(); return; }
       res.sendFile(fileURLToPath(new URL('../../public/queue.js', import.meta.url))); return;
     }
+    if (req.method === 'GET' && req.path === '/assets/schedules.js') {
+      if (!consoleSession(req)) { res.status(401).end(); return; }
+      res.sendFile(fileURLToPath(new URL('../../public/schedules.js', import.meta.url))); return;
+    }
     if (req.method === 'GET' && req.path === '/favicon.ico') { res.status(204).end(); return; }
     if (req.path === '/healthz' && req.method === 'GET') {
       const ready = service.health().ready;
@@ -134,6 +139,22 @@ export function createHttpApp(service: TaskService, token: string, accountStatus
   });
   app.get('/console/settings', (_req, res) => res.json(service.getSettings()));
   app.put('/console/settings', async (req, res) => res.json(await service.updateSettings(req.body, consoleSession(req)!.username)));
+  app.use('/console/schedules', (req, res, next) => {
+    if (!consoleSession(req)) { res.status(403).json({ error: { code: 'CONSOLE_ONLY', message: 'Console login required' } }); return; }
+    if (req.method !== 'GET' && !sameOriginPost(req)) {
+      res.status(403).json({ error: { code: 'ORIGIN_DENIED', message: 'Same-origin request required' } }); return;
+    }
+    if (!schedules) { res.status(503).json({ error: { code: 'SCHEDULES_UNAVAILABLE', message: 'Scheduled tasks are unavailable' } }); return; }
+    next();
+  });
+  app.get('/console/schedules', (_req, res) => res.json({ items: schedules!.list() }));
+  app.post('/console/schedules', async (req, res) => res.status(201).json(await schedules!.create(req.body)));
+  app.get('/console/schedules/:id/runs', (req, res) => res.json({ items: schedules!.runs(req.params.id) }));
+  app.put('/console/schedules/:id/enabled', async (req, res) => {
+    const { enabled } = z.object({ enabled: z.boolean() }).strict().parse(req.body);
+    res.json(await schedules!.setEnabled(req.params.id, enabled));
+  });
+  app.post('/console/schedules/:id/run', async (req, res) => res.status(202).json(await schedules!.runNow(req.params.id)));
   app.use('/console/codex-login', (req, res, next) => {
     if (!consoleSession(req)) { res.status(403).json({ error: { code: 'CONSOLE_ONLY', message: 'Console login required' } }); return; }
     if (req.method !== 'GET' && !sameOriginPost(req)) {
