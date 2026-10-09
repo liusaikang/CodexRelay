@@ -5,6 +5,7 @@ import { AppError, type Execution, type RunEvent, type RunResult } from '../type
 export async function runCodex(execution: Execution, signal: AbortSignal, emit: (event: RunEvent) => Promise<void>): Promise<RunResult> {
   await mkdir(execution.codexHome, { recursive: true, mode: 0o700 });
   const nativeConfig: NonNullable<CodexOptions['config']> = { shell_environment_policy: { inherit: 'core' } };
+  if (execution.developerInstructions) nativeConfig.developer_instructions = execution.developerInstructions;
   if (execution.providerId) nativeConfig.model_provider = execution.providerId;
   if (execution.providerId && execution.providerId !== 'openai') {
     if (!execution.providerBaseUrl || !execution.providerEnvKey) {

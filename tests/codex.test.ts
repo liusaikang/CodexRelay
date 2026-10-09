@@ -48,6 +48,17 @@ it.each(['read-only', 'workspace-write', 'danger-full-access'] as const)('uses c
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
+it('passes each turn developer instructions through native config, separate from user input', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'codex-prompt-'));
+  try {
+    await runCodex({ taskId: 'prompt', question: 'Inspect this issue', developerInstructions: 'Cite evidence',
+      directory: dir, codexHome: dir, env: {}, threadId: 'existing-thread' }, new AbortController().signal, async () => {});
+    expect(sdk.config.config.developer_instructions).toBe('Cite evidence');
+    expect(sdk.input).toBe('Inspect this issue');
+    expect(sdk.resumed).toBe('existing-thread');
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
 it('presents optional structured context as reference data rather than instructions', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'codex-context-'));
   try {

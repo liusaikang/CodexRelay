@@ -41,7 +41,7 @@ try {
 | 工具 | 参数 | 结果 |
 | --- | --- | --- |
 | `codex_get_service_info` | `{}` | 模型默认值、执行目录、队列容量、执行策略 |
-| `codex_submit_task` | `question`, `context?`, `sessionId?`, `idempotencyKey?`, `sandboxMode?` | 任务对象，通常为 `queued` 或 `running` |
+| `codex_submit_task` | `question`, `context?`, `sessionId?`, `idempotencyKey?`, `sandboxMode?`, `systemPrompt?` | 任务对象，通常为 `queued` 或 `running` |
 | `codex_get_task` | `taskId` | 任务状态、结果、错误、调度原因 |
 | `codex_cancel_task` | `taskId` | 取消请求后的任务状态 |
 | `codex_list_sessions` | `offset?`, `limit?` | `{ total, offset, limit, items }` |
@@ -49,7 +49,7 @@ try {
 
 成功返回 `structuredContent: { data: ... }`，同时提供 JSON 文本 `content`；业务错误返回 `isError: true` 和含 `code/message` 的文本。HTTP 200 不代表工具执行成功。参数校验错误由 MCP SDK 返回。
 
-提交只接受上述五个字段。`sandboxMode` 使用 SDK 原生的 `read-only`、`workspace-write`、`danger-full-access`，权限范围和默认行为见 [HTTP 请求契约](http-api.md#sandboxmode)。同会话连续追问会串行执行；模型结束前工具调用就已返回任务标识。轮询间隔建议 2–5 秒，不要紧密循环。
+提交只接受上述六个字段。`systemPrompt` 是本轮可选的附加开发者指令；空值使用默认文件，同会话每轮可更改，详见 [HTTP 请求契约](http-api.md)。`sandboxMode` 使用 SDK 原生的 `read-only`、`workspace-write`、`danger-full-access`，权限范围和默认行为见 [HTTP 请求契约](http-api.md#sandboxmode)。同会话连续追问会串行执行；模型结束前工具调用就已返回任务标识。轮询间隔建议 2–5 秒，不要紧密循环。
 
 网络中断时复用原幂等键提交相同参数；模型已经失败时不能用旧幂等键要求重跑。控制台和 HTTP 的 `/retry` 是新会话重试操作，不新增 MCP 工具。MCP 调用方可使用新的 `codex_submit_task` 创建独立任务。
 

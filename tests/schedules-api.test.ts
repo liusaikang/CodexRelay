@@ -43,7 +43,7 @@ it('limits schedule management to the logged-in console and records runs', async
   const cookie = login.headers.get('set-cookie')!.split(';')[0]!;
   const browserHeaders = { Cookie: cookie, Origin: base, 'Content-Type': 'application/json' };
   expect((await fetch(`${base}/assets/schedules.js`, { headers: { Cookie: cookie } })).status).toBe(200);
-  const input = { name: 'Review', question: 'Review records', intervalMinutes: 5, enabled: true };
+  const input = { name: 'Review', question: 'Review records', systemPrompt: 'Check evidence first', intervalMinutes: 5, enabled: true };
   expect((await fetch(`${base}/console/schedules`, { method: 'POST', headers: { Cookie: cookie, 'Content-Type': 'application/json' },
     body: JSON.stringify(input) })).status).toBe(403);
   expect((await fetch(`${base}/console/schedules`, { method: 'POST', headers: browserHeaders,
@@ -51,12 +51,13 @@ it('limits schedule management to the logged-in console and records runs', async
   const created = await fetch(`${base}/console/schedules`, { method: 'POST', headers: browserHeaders, body: JSON.stringify(input) });
   expect(created.status).toBe(201);
   const rule = await created.json();
-  expect(rule).toMatchObject({ name: 'Review', intervalMinutes: 5, sessions: [null,null,null,null] });
-  expect((await (await fetch(`${base}/console/schedules`, { headers: browserHeaders })).json()).items[0]).toMatchObject({ id: rule.id, laneLimit: 4 });
+  expect(rule).toMatchObject({ name: 'Review', systemPrompt: 'Check evidence first', intervalMinutes: 5, sessions: [null,null,null,null] });
+  expect((await (await fetch(`${base}/console/schedules`, { headers: browserHeaders })).json()).items[0]).toMatchObject({ id: rule.id, systemPrompt: 'Check evidence first', laneLimit: 4 });
   const manual = await fetch(`${base}/console/schedules/${rule.id}/run`, { method: 'POST', headers: browserHeaders });
   expect(manual.status).toBe(202);
   const run = await manual.json();
-  expect(run).toMatchObject({ scheduleId: rule.id, state: 'submitted' });
+  expect(run).toMatchObject({ scheduleId: rule.id, systemPrompt: 'Check evidence first', state: 'submitted' });
+  expect(tasks.getTask(run.taskId).request.systemPrompt).toBe('Check evidence first');
   const rows = await (await fetch(`${base}/console/schedules/${rule.id}/runs`, { headers: browserHeaders })).json();
   expect(rows.items).toHaveLength(1);
   expect(rows.items[0].taskId).toBe(run.taskId);
@@ -64,4 +65,13 @@ it('limits schedule management to the logged-in console and records runs', async
     body: JSON.stringify({ enabled: false }) });
   expect(paused.status).toBe(200);
   expect((await paused.json()).enabled).toBe(false);
+  const idle = await (await fetch(`${base}/console/schedules`, { method: 'POST', headers: browserHeaders,
+    body: JSON.stringify({ name: 'Idle', question: 'Review later', intervalMinutes: 5, enabled: false }) })).json();
+  const deleteUrl = `${base}/console/schedules/${idle.id}`;
+  expect((await fetch(deleteUrl, { method: 'DELETE', headers: bearer })).status).toBe(403);
+  expect((await fetch(deleteUrl, { method: 'DELETE', headers: { Cookie: cookie } })).status).toBe(403);
+  const deleted = await fetch(deleteUrl, { method: 'DELETE', headers: browserHeaders });
+  expect(deleted.status).toBe(200);
+  expect(await deleted.json()).toEqual({ deleted: true });
+  expect((await (await fetch(`${base}/console/schedules`, { headers: browserHeaders })).json()).items.map((item: { id: string }) => item.id)).not.toContain(idle.id);
 });

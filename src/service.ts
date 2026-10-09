@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { resolveWorkingDirectory } from './config.js';
+import { readDeveloperInstructions, resolveWorkingDirectory } from './config.js';
 import { InvocationLog, type InvocationTransport } from './invocations.js';
 import { RuntimeSettingsStore } from './settings.js';
 import { AppError, isTerminal, submitSchema, taskListSchema, retrySchema, type Execution, type Runner, type RuntimeConfig, type Session, type Store, type SubmitInput, type Task } from './types.js';
@@ -179,7 +179,8 @@ export class TaskService {
       runner: this.config.runner, envAllowlist: this.config.envAllowlist, codexPath: this.config.codexPath }) };
   }
   async submit(raw: SubmitInput, transport: InvocationTransport = 'http', retryOfTaskId?: string) {
-    const request = submitSchema.parse(raw);
+    const { systemPrompt, ...parsedRequest } = submitSchema.parse(raw);
+    const request = systemPrompt?.trim() ? { ...parsedRequest, systemPrompt: systemPrompt.trim() } : parsedRequest;
     this.available();
     const requestHash = hash(retryOfTaskId ? { request, retryOfTaskId } : request), key = request.idempotencyKey;
     if (key) {
@@ -285,7 +286,7 @@ export class TaskService {
     }
     this.armQueueTimer();
   }
-  private execution(task: Task): Execution {
+  private async execution(task: Task): Promise<Execution> {
     const session = this.sessions.get(task.sessionId)!;
     const providerId = session.providerId ?? 'openai';
     const provider = this.provider(providerId);
@@ -293,10 +294,13 @@ export class TaskService {
     const permitted = ['PATH', 'Path', 'SystemRoot', 'WINDIR', 'COMSPEC', 'PATHEXT', 'TEMP', 'TMP', 'TMPDIR', 'HOME', 'USERPROFILE', 'LOCALAPPDATA', 'APPDATA', 'LANG', 'LC_ALL', ...this.config.envAllowlist];
     for (const key of permitted) if (process.env[key] !== undefined && key !== this.config.tokenEnv && key !== 'NODE_OPTIONS' && key !== 'CODEX_HOME') env[key] = process.env[key]!;
     env.CODEX_HOME = this.config.codexHome;
+    const developerInstructions = task.request.systemPrompt
+      ?? (this.config.defaultDeveloperInstructionsFile
+        ? await readDeveloperInstructions(this.config.defaultDeveloperInstructionsFile) : undefined);
     return { taskId: task.taskId, question: task.request.question, context: task.request.context, directory: session.workingDirectory!,
       codexHome: this.config.codexHome, model: session.model, modelReasoningEffort: session.modelReasoningEffort, threadId: session.threadId,
       providerId, providerBaseUrl: provider.baseUrl, providerEnvKey: provider.envKey,
-      env, codexPath: this.config.codexPath, sandboxMode: task.sandboxMode ?? task.request.sandboxMode ?? 'danger-full-access' };
+      developerInstructions, env, codexPath: this.config.codexPath, sandboxMode: task.sandboxMode ?? task.request.sandboxMode ?? 'danger-full-access' };
   }
   private async execute(task: Task, controller: AbortController) {
     const timer = setTimeout(() => {
@@ -309,7 +313,7 @@ export class TaskService {
       }).catch(() => {});
     }, (task.timeoutSeconds ?? this.config.timeoutSeconds) * 1000);
     try {
-      const result = await this.runner.run(this.execution(task), controller.signal, event => this.exclusive(async () => {
+      const result = await this.runner.run(await this.execution(task), controller.signal, event => this.exclusive(async () => {
         if (this.fault) throw new Error('Storage unavailable');
         if (event.kind === 'thread') {
           const session = this.sessions.get(task.sessionId)!;
@@ -420,6 +424,7 @@ export class TaskService {
     }
     // A fresh thread avoids replaying a partially completed turn in existing history.
     return this.submit({ question: original.request.question, context: original.request.context,
+      systemPrompt: original.request.systemPrompt,
       sandboxMode: original.sandboxMode ?? original.request.sandboxMode ?? 'danger-full-access',
       idempotencyKey: `retry_${hash([taskId, idempotencyKey])}` }, 'http', taskId);
   }
@@ -434,6 +439,28 @@ export class TaskService {
     const tasks = this.sessionTasks.get(id) ?? [];
     const result = page(tasks, offset, limit);
     return { ...publicSession(session), tasks: { ...result, items: result.items.map(t => ({ taskId: t.taskId, status: t.status, question: t.request.question, createdAt: t.createdAt })) } };
+  }
+  async deleteSession(id: string) {
+    return this.exclusive(async () => {
+      this.available();
+      if (!this.sessions.has(id)) throw new AppError('NOT_FOUND', 'Session does not exist.', 404);
+      const history = this.sessionTasks.get(id) ?? [];
+      if (this.activeSessions.has(id) || history.some(task => !isTerminal(task))) {
+        throw new AppError('SESSION_ACTIVE', 'Wait for queued and running tasks to finish before deleting the session.', 409);
+      }
+      const taskIds = new Set(history.map(task => task.taskId));
+      if ([...this.tasks.values()].some(task => task.sessionId !== id && task.retryOfTaskId && taskIds.has(task.retryOfTaskId))) {
+        throw new AppError('SESSION_REFERENCED', 'Another session contains a retry of this session. Delete that session first.', 409);
+      }
+      await this.persist(() => this.store.deleteSession(id, [...history].reverse().map(task => task.taskId)));
+      for (const task of history) {
+        this.tasks.delete(task.taskId);
+        if (task.request.idempotencyKey) this.idempotency.delete(task.request.idempotencyKey);
+      }
+      this.sessionTasks.delete(id);
+      this.sessions.delete(id);
+      return { deleted: true, deletedTasks: history.length };
+    });
   }
   info() {
     const sandboxMode = this.config.sandboxMode ?? 'danger-full-access';

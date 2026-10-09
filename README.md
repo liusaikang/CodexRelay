@@ -10,7 +10,7 @@ A self-hosted Codex task gateway with MCP tools, HTTP APIs, persistent sessions,
 
 ## 能做什么
 
-- **接入简单**：`question` 必填，`context`、`sessionId`、`idempotencyKey` 可选。
+- **接入简单**：`question` 必填，`context`、`sessionId`、`idempotencyKey`、`systemPrompt` 可选。
 - **可控执行**：全局并发、等待容量、排队期限、执行超时，同一会话串行。
 - **持久化定时规则**：每条规则使用 4 个独立工作位和固定会话，按分钟触发；超出并行数的轮次持久化等待，空位出现后自动补位。
 - **保留记录**：任务、会话、运行配置和可选调用日志保存在文件中，无需外部数据库。
@@ -79,6 +79,8 @@ docker compose up -d
 ```
 
 返回 `taskId`、`sessionId`、`status`，每隔 2–5 秒查询 `GET /v1/tasks/{taskId}`。追问携带 `sessionId`；同一次网络请求重发复用原幂等键，新问题使用新键。完整示例见 [HTTP API](docs/http-api.md)。
+
+可选的 `systemPrompt` 为**本轮**覆盖 Codex 的附加开发者指令，例如 `"systemPrompt": "按结论、证据、待核实事项回答"`。省略、传 `null`、空串或全空格时，使用 [默认指令文件](config/default-developer-instructions.md)。同一 `sessionId` 的每轮可传不同内容，不会因指令变化拒绝追问；旧轮的历史仍可能留在 Codex 会话中。默认文件在任务开始执行时读取，修改后无需重启，但已运行的任务不受影响。这里的指令不会替换 Codex 内置系统提示词，也不能代替沙箱权限控制。请求中显式传入的指令会保存在任务记录中，请勿放入密码或密钥。
 
 ## MCP 调用
 

@@ -105,6 +105,11 @@ export class FileStore implements Store {
   }
   async saveTask(task: Task) { this.assertOwned(); await atomicJson(join(this.directory, 'tasks', `${idSchema.parse(task.taskId)}.json`), task); }
   async saveSession(session: Session) { this.assertOwned(); await atomicJson(join(this.directory, 'sessions', `${idSchema.parse(session.sessionId)}.json`), session); }
+  async deleteSession(sessionId: string, taskIds: string[]) {
+    this.assertOwned();
+    for (const id of taskIds) await unlink(join(this.directory, 'tasks', `${idSchema.parse(id)}.json`));
+    await unlink(join(this.directory, 'sessions', `${idSchema.parse(sessionId)}.json`));
+  }
   private assertOwned() { if (!this.owned) throw new Error('Store is not open'); }
   async close() {
     if (!this.owned) return;

@@ -3,15 +3,15 @@ export function createTaskPanel({api,formatTime,message,serviceStatus,bootstrap,
   let serviceInfo = null, submitting = false, taskReady = false;
   let selectedSession = '', viewEpoch = 0, historyOffset = 0, totalTurns = 0, refreshEpoch = null, monitorTimer;
   let sessionsOffset = 0, sessionsTotal = 0, sessionListEpoch = 0;
-  const turnRows = new Map(), collapsedTurns = new Set(), resumingSessions = new Set();
+  const turnRows = new Map(), collapsedTurns = new Set(), resumingSessions = new Set(), deletingSessions = new Set();
   const terminal = item => !['queued','running'].includes(item.status);
   function syncTaskControls() {
     if (!$('task-view')) return;
-    const enabled = taskReady && !submitting;
-    for (const id of ['question','context','sandbox-mode','session','new-session','refresh-sessions']) $(id).disabled = !enabled;
+    const enabled = taskReady && !submitting && !deletingSessions.size;
+    for (const id of ['question','system-prompt','context','sandbox-mode','session','new-session','refresh-sessions']) $(id).disabled = !enabled;
     $('submit').disabled = !enabled;
     $('submit-label').textContent = submitting ? '提交中…' : '提交任务';
-    for (const button of $('sessions').querySelectorAll('button')) button.disabled = submitting;
+    for (const button of $('sessions').querySelectorAll('button')) button.disabled = !enabled;
     $('session-prev').disabled = !enabled || sessionsOffset === 0;
     $('session-next').disabled = !enabled || sessionsOffset + 6 >= sessionsTotal;
   }
@@ -25,7 +25,7 @@ export function createTaskPanel({api,formatTime,message,serviceStatus,bootstrap,
     markSession();
   }
   function markSession() {
-    for (const button of $('sessions').querySelectorAll('button')) button.setAttribute('aria-current',String(button.dataset.sessionId === selectedSession));
+    for (const button of $('sessions').querySelectorAll('.session-open')) button.setAttribute('aria-current',String(button.dataset.sessionId === selectedSession));
   }
   const element = (tag, className, text) => { const node = document.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = text; return node; };
   const elapsed = (start, end) => start ? Math.max(0,(Date.parse(end || new Date().toISOString()) - Date.parse(start)) / 1000).toFixed(1) + ' s' : '—';
@@ -242,11 +242,29 @@ export function createTaskPanel({api,formatTime,message,serviceStatus,bootstrap,
     syncTaskControls();
     if (!data.items.length) { const li = document.createElement('li'); li.className = 'muted'; li.textContent = '暂无会话'; $('sessions').append(li); return; }
     for (const session of data.items) {
-      const li = document.createElement('li'), button = document.createElement('button'), text = document.createElement('span'), time = document.createElement('span');
-      button.dataset.sessionId = session.sessionId; button.disabled = submitting;
-      text.className = 'history-title mono'; text.textContent = session.sessionId; time.className = 'history-time'; time.textContent = formatTime(session.createdAt); button.append(text,time); li.append(button); $('sessions').append(li);
+      const li = document.createElement('li'), button = document.createElement('button'), remove = document.createElement('button');
+      const text = document.createElement('span'), time = document.createElement('span');
+      li.className = 'history-entry'; button.className = 'session-open'; button.type = 'button';
+      button.dataset.sessionId = session.sessionId; button.disabled = !taskReady || submitting || !!deletingSessions.size;
+      text.className = 'history-title mono'; text.textContent = session.sessionId; time.className = 'history-time'; time.textContent = formatTime(session.createdAt); button.append(text,time);
+      remove.className = 'session-delete'; remove.type = 'button'; remove.textContent = '删除';
+      remove.setAttribute('aria-label',`删除会话 ${session.sessionId}`);
+      remove.disabled = button.disabled;
+      li.append(button,remove); $('sessions').append(li);
       button.onclick = async () => {
         if (!submitting) await selectSession(session.sessionId);
+      };
+      remove.onclick = async () => {
+        if (submitting || deletingSessions.size || !confirm(`确定删除会话 ${session.sessionId} 及其全部任务对话记录吗？调用审计日志和 Codex 原生历史仍会保留。此操作无法撤销。`)) return;
+        deletingSessions.add(session.sessionId); syncTaskControls(); message('task-message');
+        try {
+          await api(`/console/sessions/${encodeURIComponent(session.sessionId)}`,{method:'DELETE'});
+          if (selectedSession === session.sessionId) resetTask();
+          else if ($('session').value.trim() === session.sessionId) $('session').value = '';
+          if (sessionsOffset > 0 && sessionsOffset >= sessionsTotal - 1) sessionsOffset = Math.max(0,sessionsOffset - 6);
+          await refreshSessions();
+        } catch (error) { message('task-message',`删除会话失败：${error.message}`); }
+        finally { deletingSessions.delete(session.sessionId); syncTaskControls(); }
       };
     }
     markSession();
@@ -280,6 +298,9 @@ export function createTaskPanel({api,formatTime,message,serviceStatus,bootstrap,
     event.preventDefault(); if (!taskReady || submitting) return;
     if (!$('question').value.trim()) { message('task-message','请先填写问题内容。'); $('question').focus(); return; }
     message('task-message'); const request = {question:$('question').value,idempotencyKey:crypto.randomUUID()}; const rawContext = $('context').value.trim();
+    const systemPrompt = $('system-prompt').value.trim();
+    if (new TextEncoder().encode(systemPrompt).length > 16 * 1024) { message('task-message','系统提示词不能超过 16 KiB。'); $('system-prompt').focus(); return; }
+    if (systemPrompt) request.systemPrompt = systemPrompt;
     if (rawContext) { try { const value = JSON.parse(rawContext); if (!value || Array.isArray(value) || typeof value !== 'object') throw new Error(); request.context = value; } catch { message('task-message','附加上下文必须是有效的 JSON 对象。'); return; } }
     request.sandboxMode = $('sandbox-mode').value;
     if ($('session').value.trim()) request.sessionId = $('session').value.trim();
@@ -287,7 +308,7 @@ export function createTaskPanel({api,formatTime,message,serviceStatus,bootstrap,
     let accepted;
     try {
       accepted = await api('/v1/tasks',{method:'POST',body:JSON.stringify(request)});
-      $('session').value = accepted.sessionId; $('question').value = ''; $('context').value = '';
+      $('session').value = accepted.sessionId; $('question').value = ''; $('system-prompt').value = ''; $('context').value = '';
       if (selectedSession !== accepted.sessionId) await selectSession(accepted.sessionId,accepted.taskId,accepted);
       else { await refreshConversation({focusId:accepted.taskId}); }
       sessionsOffset = 0; await refreshSessions(); await refreshHealth(); startMonitor();
@@ -298,7 +319,7 @@ export function createTaskPanel({api,formatTime,message,serviceStatus,bootstrap,
     finally { submitting = false; syncTaskControls(); }
   };
   $('question').oninput = syncTaskControls;
-  $('new-session').onclick = () => { $('session').value = ''; $('question').value = ''; $('context').value = ''; resetTask(); syncTaskControls(); $('question').focus(); };
+  $('new-session').onclick = () => { $('session').value = ''; $('question').value = ''; $('system-prompt').value = ''; $('context').value = ''; resetTask(); syncTaskControls(); $('question').focus(); };
   $('refresh-sessions').onclick = () => { void refreshSessions().catch(error => message('task-message',error.message)); };
   for (const [id,step] of [['session-prev',-6],['session-next',6]]) $(id).onclick = () => { sessionsOffset = Math.max(0,sessionsOffset+step); void refreshSessions().catch(error => message('task-message',error.message)); };
   $('load-older').onclick = () => { void refreshConversation({older:true}); };

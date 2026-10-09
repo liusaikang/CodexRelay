@@ -191,12 +191,18 @@ export function createHttpApp(service: TaskService, token: string, accountStatus
   });
   app.get('/console/schedules', (_req, res) => res.json({ items: schedules!.list() }));
   app.post('/console/schedules', async (req, res) => res.status(201).json(await schedules!.create(req.body)));
+  app.delete('/console/schedules/:id', async (req, res) => { await schedules!.delete(req.params.id); res.json({ deleted: true }); });
   app.get('/console/schedules/:id/runs', (req, res) => res.json({ items: schedules!.runs(req.params.id) }));
   app.put('/console/schedules/:id/enabled', async (req, res) => {
     const { enabled } = z.object({ enabled: z.boolean() }).strict().parse(req.body);
     res.json(await schedules!.setEnabled(req.params.id, enabled));
   });
   app.post('/console/schedules/:id/run', async (req, res) => res.status(202).json(await schedules!.runNow(req.params.id)));
+  app.delete('/console/sessions/:id', async (req, res) => {
+    if (!consoleSession(req)) { res.status(403).json({ error: { code: 'CONSOLE_ONLY', message: 'Console login required' } }); return; }
+    if (!sameOriginPost(req)) { res.status(403).json({ error: { code: 'ORIGIN_DENIED', message: 'Same-origin request required' } }); return; }
+    res.json(await (schedules ? schedules.deleteSession(idSchema.parse(req.params.id)) : service.deleteSession(idSchema.parse(req.params.id))));
+  });
   app.use('/console/codex-login', (req, res, next) => {
     if (!consoleSession(req)) { res.status(403).json({ error: { code: 'CONSOLE_ONLY', message: 'Console login required' } }); return; }
     if (req.method !== 'GET' && !sameOriginPost(req)) {

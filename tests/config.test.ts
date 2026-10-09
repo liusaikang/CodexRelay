@@ -37,6 +37,7 @@ it('validates sandbox modes and expands their environment configuration', async 
 it('loads the development environment with its existing history and invocation log', async () => {
   const config = await loadConfig(resolve('config/development.yaml'));
   expect(config.defaultWorkingDirectory).toBe(await realpath('examples/workspace'));
+  expect(config.defaultDeveloperInstructionsFile).toBe(resolve('config/default-developer-instructions.md'));
   expect(config).not.toHaveProperty('capabilities');
   expect(config).not.toHaveProperty('projects');
   expect(config.dataDir).toBe(resolve('data/native-logs-preview'));
@@ -53,6 +54,19 @@ it('loads the development environment with its existing history and invocation l
   expect(config.defaultReasoningEffort).toBe('high');
   expect(config.modelProviders?.[1]?.models).toContain('qwen3.7-plus');
   expect(config.modelProviders?.[1]?.models).toEqual(['qwen3.7-max', 'qwen3.7-plus', 'qwen3.7-flash', 'glm-5.3']);
+});
+
+it('requires a nonempty default developer instructions file when configured', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'relay-prompt-config-'));
+  try {
+    const file = join(dir, 'config.yaml');
+    await writeFile(file, stringify({ codex: { defaultWorkingDirectory: '.', developerInstructionsFile: './prompt.md' } }));
+    await expect(loadConfig(file)).rejects.toThrow();
+    await writeFile(join(dir, 'prompt.md'), '  ');
+    await expect(loadConfig(file)).rejects.toThrow('1 to 16 KiB');
+    await writeFile(join(dir, 'prompt.md'), 'Default instructions');
+    expect((await loadConfig(file)).defaultDeveloperInstructionsFile).toBe(join(dir, 'prompt.md'));
+  } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
 it('validates configured model providers and never accepts a credential value in place of an environment variable name', async () => {

@@ -52,6 +52,14 @@ try {
       if (failSessionList) return route.fulfill({status:503,json:{error:{message:'session list unavailable'}}});
       return json({ items: sessions, total: sessions.length, offset: 0, limit: 6 });
     }
+    if (path.startsWith('/console/sessions/') && route.request().method() === 'DELETE') {
+      const id = path.split('/').at(-1), index = sessions.findIndex(session => session.sessionId === id);
+      if (index < 0) return route.fulfill({status:404,json:{error:{message:'Session does not exist.'}}});
+      const deletedTasks = rows.filter(row => row.sessionId === id).length;
+      sessions.splice(index,1);
+      for (let i = rows.length - 1; i >= 0; i--) if (rows[i].sessionId === id) rows.splice(i,1);
+      return json({deleted:true,deletedTasks});
+    }
     if (path === '/v1/tasks' && route.request().method() === 'POST') {
       const input = route.request().postDataJSON(); submissions.push(input);
       const accepted = { ...task(52,input.sessionId || sid(1)), request: input };
@@ -86,7 +94,7 @@ try {
   });
   await page.goto('http://127.0.0.1:8787/');
   await page.getByRole('button', { name: 'Codex 调用', exact: true }).click();
-  await page.locator('#sessions button').first().click();
+  await page.locator('#sessions .session-open').first().click();
   await expect(page.locator('#turns article')).toHaveCount(20);
   await expect(page.locator('#turns article').first()).toContainText('排队中');
   await expect(page.locator('#turns article').last()).toContainText('问题 6');
@@ -141,9 +149,9 @@ try {
   }
   // A late response from a previous selection must never replace the current session.
   delaySession = true;
-  await page.locator('#sessions button').first().click();
+  await page.locator('#sessions .session-open').first().click();
   await expect.poll(() => typeof releaseSession).toBe('function');
-  await page.locator('#sessions button').nth(1).click();
+  await page.locator('#sessions .session-open').nth(1).click();
   await expect(page.locator('#turns article')).toHaveCount(1);
   await expect(page.locator('#turns article')).toContainText('回答 26');
   releaseSession();
@@ -167,7 +175,7 @@ try {
   await expect(page.locator('#task-message')).toContainText('不能据此判断请求未到达');
   await expect(page.locator('#session')).toHaveValue('');
   failTask = true;
-  await page.locator('#sessions button').first().click();
+  await page.locator('#sessions .session-open').first().click();
   await expect(page.locator(`article[data-task-id="${tid(25)}"]`)).toContainText('详情读取失败');
   failTask = false;
   await page.getByRole('button', { name: '刷新会话记录', exact: true }).click();
@@ -182,24 +190,36 @@ try {
   await page.getByRole('button', { name: '新建会话', exact: true }).click();
   await expect(page.locator('#turns article')).toHaveCount(0);
   await expect(page.locator('#session')).toHaveValue('');
-  await page.locator('#sessions button').first().click();
+  await page.locator('#sessions .session-open').first().click();
   delayRetry = true;
   page.once('dialog',dialog => dialog.accept());
   await page.locator(`article[data-task-id="${tid(24)}"]`).getByRole('button',{name:'新会话重试',exact:true}).click();
   await expect.poll(() => !!releaseRetry).toBe(true);
-  await page.locator('#sessions button').nth(1).click();
+  await page.locator('#sessions .session-open').nth(1).click();
   await expect(page.locator('#session')).toHaveValue(sid(2));
   await page.getByLabel('问题内容').fill('这是第二个会话的草稿');
   releaseRetry();
   await expect(page.locator('#task-message')).toContainText('当前会话与草稿保持不变');
   await expect(page.locator('#session')).toHaveValue(sid(2));
   await expect(page.getByLabel('问题内容')).toHaveValue('这是第二个会话的草稿');
-  await page.locator('#sessions button').first().click();
+  await page.locator('#sessions .session-open').first().click();
   failSessionList = true;
   page.once('dialog',dialog => dialog.accept());
   await page.locator(`article[data-task-id="${tid(24)}"]`).getByRole('button',{name:'新会话重试',exact:true}).click();
   await expect(page.locator('#task-message')).toContainText(`重试已接收：${tid(71)}，页面同步失败`);
   await expect(page.locator('#task-message')).not.toContainText('操作未确认完成');
+  failSessionList = false;
+  await page.getByRole('button',{name:'刷新会话',exact:true}).click();
+  await page.locator(`.session-open[data-session-id="${sid(2)}"]`).click();
+  await expect(page.locator('#active-session')).toHaveText(sid(2));
+  page.once('dialog', dialog => { assert.match(dialog.message(),/Codex 原生历史仍会保留/); void dialog.dismiss(); });
+  await page.getByRole('button',{name:`删除会话 ${sid(2)}`}).click();
+  await expect(page.locator(`.session-open[data-session-id="${sid(2)}"]`)).toHaveCount(1);
+  page.once('dialog', dialog => { assert.match(dialog.message(),/无法撤销/); void dialog.accept(); });
+  await page.getByRole('button',{name:`删除会话 ${sid(2)}`}).click();
+  await expect(page.locator(`.session-open[data-session-id="${sid(2)}"]`)).toHaveCount(0);
+  await expect(page.locator('#active-session')).toHaveText('—');
+  assert.equal(sessions.some(session => session.sessionId === sid(2)),false);
   assert.deepEqual(errors, []);
   console.log('Session smoke passed: latest/older turns, queue/running/failure, diagnostics, lookup, stale responses, retry, layouts. No real tasks submitted.');
 } finally { releaseSession?.(); releaseRetry?.(); await browser.close(); }

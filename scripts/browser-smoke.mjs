@@ -128,6 +128,10 @@ try {
         size:54,modifiedAt:'2026-09-24T06:00:00.000Z' } });
     }
     if (path === `/console/schedules/${scheduleId}/runs`) return route.fulfill({ json: { items: scheduledRuns } });
+    if (path === `/console/schedules/${scheduleId}` && request.method() === 'DELETE') {
+      scheduleRules.length = 0; scheduledRuns.length = 0;
+      return route.fulfill({ json: { deleted: true } });
+    }
     if (path === `/console/schedules/${scheduleId}/run`) {
       scheduledRuns.push({ id: runId, scheduleId, scheduledAt: '2026-09-24T06:00:01.000Z', state: 'waiting' });
       scheduleRules[0].waiting = 1;
@@ -188,12 +192,15 @@ try {
   await expect(page.getByLabel('执行权限')).toHaveValue('danger-full-access');
   await page.getByLabel('执行权限').selectOption('read-only');
   await page.getByLabel('问题内容').fill('分析这个测试问题');
+  await page.getByLabel('系统提示词').fill('请按证据回答');
   await page.getByLabel('附加上下文 JSON').fill('{"source":"browser-smoke"}');
   await submit.click();
   await expect(page.locator('#turns .task-status')).toHaveText('已完成');
   await expect(page.locator('#turns .turn-answer')).toHaveText('模拟 Codex 分析结果');
   assert.equal(submissions.length, 1);
   assert.equal(submissions[0].question, '分析这个测试问题');
+  assert.equal(submissions[0].systemPrompt, '请按证据回答');
+  await expect(page.getByLabel('系统提示词')).toHaveValue('');
   assert.deepEqual(submissions[0].context, { source: 'browser-smoke' });
   assert.equal(submissions[0].sandboxMode, 'read-only');
   await checkLayout(page);
@@ -201,12 +208,26 @@ try {
   await expect(page.locator('#schedule-list')).toContainText('暂无定时规则');
   await page.getByLabel('规则名称').fill('商品核验');
   await page.getByLabel('每轮任务内容').fill('核验待处理商品');
+  await page.locator('#schedule-system-prompt').fill('先核对来源，再回答');
   await page.getByRole('button', { name: '创建规则' }).click();
+  await expect(page.locator('#schedules-message')).toHaveAttribute('data-tone','success');
   await expect(page.locator('#schedule-list')).toContainText('商品核验');
+  await expect(page.locator('#schedule-list')).toContainText('核验待处理商品');
+  await expect(page.locator('#schedule-list')).toContainText('先核对来源，再回答');
+  assert.equal(scheduleRules[0].systemPrompt, '先核对来源，再回答');
   await page.getByRole('button', { name: '立即运行' }).click();
   await expect(page.locator('#schedule-runs-body')).toContainText('等待工作位');
   await page.getByRole('button', { name: '暂停', exact: true }).click();
+  await expect(page.locator('#schedules-message')).toHaveAttribute('data-tone','info');
   await expect(page.locator('#schedule-list')).toContainText('已暂停');
+  page.once('dialog', dialog => { assert.match(dialog.message(),/商品核验/); void dialog.dismiss(); });
+  await page.getByRole('button', { name: '删除', exact: true }).click();
+  await expect(page.locator('#schedule-list')).toContainText('商品核验');
+  page.once('dialog', dialog => { assert.match(dialog.message(),/执行轮次记录/); void dialog.accept(); });
+  await page.getByRole('button', { name: '删除', exact: true }).click();
+  await expect(page.locator('#schedule-list')).toContainText('暂无定时规则');
+  await expect(page.locator('#schedules-message')).toHaveAttribute('data-tone','success');
+  assert.equal(scheduleRules.length,0);
   await checkLayout(page);
   await page.getByRole('button', { name: '项目 Skills', exact: true }).click();
   await expect(page.locator('#skills-workspace')).toHaveText('D:/workspace/project');

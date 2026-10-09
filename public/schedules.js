@@ -6,8 +6,15 @@ export function createSchedulesPanel({api,formatTime,onInspect}) {
     if (className) element.className = className;
     return element;
   };
-  let visible = false, selectedId = '', timer, loading = false;
-  const notice = value => { $('schedules-message').textContent = value; $('schedules-message').classList.toggle('hidden',!value); };
+  let visible = false, selectedId = '', timer, noticeTimer, loading = false;
+  const notice = (value, tone = 'error') => {
+    clearTimeout(noticeTimer);
+    const message = $('schedules-message');
+    message.textContent = value;
+    message.dataset.tone = tone;
+    message.classList.toggle('hidden',!value);
+    if (value && tone !== 'error') noticeTimer = setTimeout(() => notice(''),5000);
+  };
   const stateText = run => run.state === 'waiting' ? '等待工作位'
     : run.state === 'failed' ? '提交失败'
       : run.state === 'finished' ? ({succeeded:'成功',failed:'失败',timed_out:'超时',interrupted:'中断',cancelled:'取消'}[run.taskStatus] || run.taskStatus || '已结束')
@@ -16,8 +23,8 @@ export function createSchedulesPanel({api,formatTime,onInspect}) {
     clearTimeout(timer);
     if (visible && !document.hidden) timer = setTimeout(() => { void load(); },5000);
   }
-  async function operate(path,options,message) {
-    try { await api(path,options); notice(message); await load(); }
+  async function operate(path,options,message,tone = 'success') {
+    try { await api(path,options); notice(message,tone); await load(); }
     catch (error) { notice(`操作结果未确认，请刷新核对：${error.message}`); }
   }
   function renderRules(items) {
@@ -27,7 +34,12 @@ export function createSchedulesPanel({api,formatTime,onInspect}) {
       const row = node('div',undefined,'schedule-row'); row.setAttribute('aria-current',String(selectedId === rule.id));
       const info = node('div');
       info.append(node('h3',rule.name),node('p',`每 ${rule.intervalMinutes} 分钟 · ${rule.enabled ? '已启用' : '已暂停'} · 执行 ${rule.running}/${rule.laneLimit} · 等待 ${rule.waiting}`),
-        node('p',`下次触发：${rule.enabled ? formatTime(rule.nextRunAt) : '暂停'} · ${rule.question}`));
+        node('p',`下次触发：${rule.enabled ? formatTime(rule.nextRunAt) : '暂停'}`));
+      for (const [label,value] of [['任务提示词',rule.question],['系统提示词',rule.systemPrompt?.trim() || '使用默认系统提示词（执行时读取）']]) {
+        const field = node('div',undefined,'schedule-prompt');
+        field.append(node('strong',label),node('p',value));
+        info.append(field);
+      }
       const controls = node('div',undefined,'row');
       const inspect = node('button','查看轮次'); inspect.type = 'button'; inspect.onclick = () => { selectedId = rule.id; void load(); };
       const trigger = node('button','立即运行'); trigger.type = 'button'; trigger.onclick = () => {
@@ -35,9 +47,17 @@ export function createSchedulesPanel({api,formatTime,onInspect}) {
       };
       const toggle = node('button',rule.enabled ? '暂停' : '启用'); toggle.type = 'button'; toggle.onclick = () => {
         void operate(`/console/schedules/${rule.id}/enabled`,{method:'PUT',body:JSON.stringify({enabled:!rule.enabled})},
-          rule.enabled ? '已暂停新的定时触发；已等待的轮次仍会继续。' : '已启用规则。');
+          rule.enabled ? '已暂停新的定时触发；已等待的轮次仍会继续。' : '已启用规则。',rule.enabled ? 'info' : 'success');
       };
-      controls.append(inspect,trigger,toggle); row.append(info,controls); $('schedule-list').append(row);
+      const remove = node('button','删除','danger'); remove.type = 'button';
+      remove.disabled = rule.running > 0;
+      remove.title = remove.disabled ? '有已提交的执行轮次，结束后才能删除' : '删除规则及其执行轮次记录';
+      remove.onclick = () => {
+        const waiting = rule.waiting ? `，并放弃 ${rule.waiting} 条等待中的轮次` : '';
+        if (!window.confirm(`确定删除定时任务“${rule.name}”及其执行轮次记录${waiting}吗？已生成的普通任务结果会保留。此操作无法撤销。`)) return;
+        void operate(`/console/schedules/${rule.id}`,{method:'DELETE'},'定时任务及其执行轮次记录已删除。');
+      };
+      controls.append(inspect,trigger,toggle,remove); row.append(info,controls); $('schedule-list').append(row);
     }
   }
   async function renderRuns() {
@@ -76,14 +96,16 @@ export function createSchedulesPanel({api,formatTime,onInspect}) {
     if (!form.reportValidity()) return;
     const request = {name:$('schedule-name').value.trim(),question:$('schedule-question').value.trim(),
       intervalMinutes:Number($('schedule-interval').value),enabled:true};
+    const systemPrompt = $('schedule-system-prompt').value.trim();
+    if (systemPrompt) request.systemPrompt = systemPrompt;
     const submit = form.querySelector('[type=submit]'); submit.disabled = true;
     try {
       const rule = await api('/console/schedules',{method:'POST',body:JSON.stringify(request)});
-      selectedId = rule.id; form.reset(); $('schedule-interval').value = '5'; notice('规则已创建，下次触发时间已写入持久化记录。'); await load();
+      selectedId = rule.id; form.reset(); $('schedule-interval').value = '5'; notice('规则已创建，下次触发时间已写入持久化记录。','success'); await load();
     } catch (error) { notice(`创建结果未确认，请刷新检查规则是否已经存在：${error.message}`); }
     finally { submit.disabled = false; }
   };
   $('schedules-refresh').onclick = () => { notice(''); void load(); };
   document.addEventListener('visibilitychange',scheduleRefresh);
-  return { show() { visible = true; void load(); }, hide() { visible = false; clearTimeout(timer); } };
+  return { show() { visible = true; void load(); }, hide() { visible = false; clearTimeout(timer); clearTimeout(noticeTimer); notice(''); } };
 }

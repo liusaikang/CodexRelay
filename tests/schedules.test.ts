@@ -1,5 +1,5 @@
 import { afterEach, expect, it } from 'vitest';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { access, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { TaskService } from '../src/service.js';
@@ -116,4 +116,55 @@ it('creates a due run once and records a catch-up after downtime without an unbo
   await schedules.tick(due + 65 * 60 * 1000);
   expect(schedules.runs(schedule.id)).toHaveLength(2);
   expect(schedules.get(schedule.id).nextRunAt).toBe(new Date(due + 70 * 60 * 1000).toISOString());
+});
+
+it('passes a custom system prompt to every run and uses the default file for blank prompts', async () => {
+  const { dir, schedules, runner, service } = await fixture();
+  const defaultFile = join(dir, 'default-instructions.md');
+  await writeFile(defaultFile, 'Default instructions', 'utf8');
+  service.config.defaultDeveloperInstructionsFile = defaultFile;
+  const custom = await schedules.create({ name: 'Custom', question: 'Analyze', systemPrompt: '  Custom instructions  ', intervalMinutes: 5, enabled: false });
+  expect(custom.systemPrompt).toBe('Custom instructions');
+  const customRun = await schedules.runNow(custom.id);
+  expect(customRun.systemPrompt).toBe('Custom instructions');
+  expect(service.getTask(customRun.taskId!).request.systemPrompt).toBe('Custom instructions');
+  expect(runner.calls[0]!.execution.developerInstructions).toBe('Custom instructions');
+
+  const blank = await schedules.create({ name: 'Default', question: 'Analyze', systemPrompt: '   ', intervalMinutes: 5, enabled: false });
+  expect(blank.systemPrompt).toBeUndefined();
+  const blankRun = await schedules.runNow(blank.id);
+  expect(blankRun.systemPrompt).toBeUndefined();
+  expect(service.getTask(blankRun.taskId!).request.systemPrompt).toBeUndefined();
+  expect(runner.calls[1]!.execution.developerInstructions).toBe('Default instructions');
+});
+
+it('deletes a completed schedule and its run files without deleting the task result', async () => {
+  const { dir, schedules, runner, service } = await fixture();
+  const rule = await schedules.create({ name: 'Remove me', question: 'Analyze', intervalMinutes: 5, enabled: false });
+  const run = await schedules.runNow(rule.id);
+  await expect(schedules.delete(rule.id)).rejects.toMatchObject({ code: 'SCHEDULE_ACTIVE', httpStatus: 409 });
+  runner.calls[0]!.finish();
+  await until(() => service.getTask(run.taskId!).status === 'succeeded');
+  await schedules.tick();
+  await schedules.delete(rule.id);
+  expect(schedules.list()).toHaveLength(0);
+  await expect(access(join(dir, 'schedules', 'definitions', `${rule.id}.json`))).rejects.toMatchObject({ code: 'ENOENT' });
+  await expect(access(join(dir, 'schedules', 'runs', `${run.id}.json`))).rejects.toMatchObject({ code: 'ENOENT' });
+  expect(service.getTask(run.taskId!).status).toBe('succeeded');
+  await schedules.close();
+  const restored = new ScheduleService(service, { autoStart: false });
+  await restored.init(); cleanup.push(() => restored.close());
+  expect(restored.list()).toHaveLength(0);
+});
+
+it('protects sessions referenced by scheduled rules until the rule is deleted', async () => {
+  const { schedules, runner, service } = await fixture();
+  const rule = await schedules.create({ name: 'Scheduled', question: 'Analyze', intervalMinutes: 5, enabled: false });
+  const run = await schedules.runNow(rule.id);
+  runner.calls[0]!.finish();
+  await until(() => service.getTask(run.taskId!).status === 'succeeded');
+  await schedules.tick();
+  await expect(schedules.deleteSession(run.sessionId!)).rejects.toMatchObject({ code: 'SESSION_SCHEDULED', httpStatus: 409 });
+  await schedules.delete(rule.id);
+  expect(await schedules.deleteSession(run.sessionId!)).toEqual({ deleted: true, deletedTasks: 1 });
 });

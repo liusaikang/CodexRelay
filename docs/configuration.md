@@ -38,6 +38,7 @@ runner: codex
 codex:
   home: ../data/codex-home
   defaultWorkingDirectory: ../examples/workspace
+  developerInstructionsFile: ./default-developer-instructions.md
   defaultModel: ${CODEX_MODEL:-}
   defaultReasoningEffort: ${CODEX_MODEL_REASONING_EFFORT:-high}
   activeProvider: ${CODEX_PROVIDER:-openai}
@@ -67,6 +68,8 @@ codex:
 `queueTimeoutSeconds` 控制等待期限，默认 1800 秒，范围 1 到 604800 秒。会话依赖等待、人工确认等待、停机时间均计入；修改配置不延长已接受任务的期限。接收阶段容量自动取 `maxConcurrent + maxQueued`，无需新增容量参数。详细状态与恢复策略见 [任务调度](scheduling.md)。
 
 以上是开发环境示意，仅可在本机使用。生产配置要求环境变量明确指定任务目录、调用日志目录、Codex home、工作目录、控制台账号密码和公开访问来源。`codex.home` 是专用持久化目录，保存认证、原生配置和线程状态，不应直接使用开发者个人日常 home。`${VARIABLE}` 缺失时应报错；`${VARIABLE:-fallback}` 使用回退值。默认模型未指定时使用供应商档案中的模型；推理强度默认 `high`，旧运行配置中的空值也会按 `high` 执行。
+
+`developerInstructionsFile` 相对 YAML 所在目录解析。固定开发和生产配置都指向 `config/default-developer-instructions.md`。启动时验证文件存在且为 1–16 KiB；每轮任务开始执行时重新读取，所以编辑文件后无需重启，已运行任务不变。HTTP/MCP 提交的非空 `systemPrompt` 只覆盖本轮，空值使用文件；不保存到会话，也不参与会话配置一致性检查。它映射到 Codex 的 `developer_instructions`，不是替换内置系统提示词。显式传入的内容会随任务记录保存，不应包含凭据。
 
 新配置不存在 `projects`、`capabilities`、`promptFile`、`skillFiles`、`mcpServers`，也不再使用顶层 `codexHome` 或 `execution`。这些旧字段不是新结构的别名，应删除并迁移，不要混用。
 

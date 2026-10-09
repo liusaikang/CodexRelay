@@ -11,6 +11,7 @@
         <form id="task-form" class="compose">
           <div class="section-heading"><h2>提交问题</h2><span class="eyebrow">POST /v1/tasks</span></div>
           <div class="field"><label for="question">问题内容</label><textarea id="question" maxlength="32000" placeholder="请描述需要 Codex 分析或处理的问题。" disabled></textarea></div>
+          <div class="field"><label for="system-prompt">系统提示词 <span class="optional">· 可选</span></label><textarea id="system-prompt" maxlength="16384" placeholder="留空使用服务默认系统提示词" disabled></textarea><div class="field-help">仅本轮生效，最多 16 KiB。</div></div>
           <div class="field"><label for="context">附加上下文 JSON <span class="optional">· 可选</span></label><textarea id="context" class="mono" maxlength="16384" placeholder='{"subject":{"account":"demo-user"}}' disabled></textarea><div class="field-help">由调用平台提供的结构化参考数据，最大 16 KiB。</div></div>
           <div class="field"><label for="sandbox-mode">执行权限</label><select id="sandbox-mode" disabled><option value="read-only">read-only · 只读</option><option value="workspace-write">workspace-write · 工作目录可写</option><option value="danger-full-access">danger-full-access · 完整权限</option></select><div class="field-help">本次任务使用的 Codex SDK 原生沙箱模式；每次提交独立生效。</div></div>
           <div class="field"><label for="session">会话 ID <span class="optional">· 可选</span></label><div class="session-line"><input id="session" class="mono" placeholder="留空创建新会话" disabled><button type="button" id="new-session" class="icon" title="新建会话" aria-label="新建会话" disabled><i data-lucide="plus"></i></button></div></div>

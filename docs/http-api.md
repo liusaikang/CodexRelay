@@ -10,11 +10,14 @@
 | --- | --- |
 | `question` | 必填，1–32000 字符，不可全为空白 |
 | `context` | 可选 JSON 对象，UTF-8 序列化后最多 16 KiB |
+| `systemPrompt` | 可选，本轮附加开发者指令，UTF-8 最多 16 KiB；空值使用默认文件 |
 | `sessionId` | 可选，续接已有会话；省略创建新会话 |
 | `idempotencyKey` | 可选，1–128 字符，同次提交重发时保持一致 |
 | `sandboxMode` | 可选，Codex SDK 原生沙箱枚举，控制本次任务的权限范围，见下表 |
 
 拒绝其他字段。请求体最多 128 KiB。模型、目录、推理强度由服务配置控制。
+
+`systemPrompt` 映射到 Codex 原生 `developer_instructions`，与 `question` 分开传递。省略、`null`、空串或全空格时，在任务实际开始执行时读取 `config/default-developer-instructions.md`；显式提供的文本随请求保存，重试时保持不变。同一个 `sessionId` 的每轮可以使用不同指令，不检查与上一轮是否一致；旧轮历史不会因此被清除。同一幂等键换用不同非空指令会返回 `IDEMPOTENCY_CONFLICT`。请求中的指令会保存在任务记录中，不要包含凭据。该参数不是权限边界，不能替代 `sandboxMode`。
 
 ### sandboxMode
 
@@ -62,6 +65,7 @@ console.log(task.taskId, task.sessionId);
 | POST | `/v1/tasks/{taskId}/retry` | 新会话重试失败任务，HTTP 202 |
 | GET | `/v1/sessions` | 会话分页，按创建时间倒序 |
 | GET | `/v1/sessions/{sessionId}` | 会话信息与任务摘要，按接收顺序 |
+| DELETE | `/console/sessions/{sessionId}` | 仅登录控制台同源请求可删除会话及其任务记录；有未结束任务或定时规则引用时返回 409 |
 | POST | `/v1/sessions/{sessionId}/resume` | 确认继续受前序失败阻塞的任务 |
 | GET | `/v1/admin/account` | 脱敏账号及额度，缓存 30 秒 |
 | POST | `/v1/admin/account/refresh` | 刷新账号及额度 |
@@ -70,6 +74,8 @@ console.log(task.taskId, task.sessionId);
 | GET | `/v1/admin/invocations/{taskId}` | 调用日志详情 |
 
 分页使用 `offset=0&limit=20`，limit 为 1–100。列表返回 `{total, offset, limit, items}`；会话详情中的分页对象位于 `tasks`。
+
+控制台删除会话会移除服务保存的会话文件及其全部任务文件，删除后不能继续追问，且不可撤销。仍有排队或运行中的任务、其他会话的重试依赖，或被定时规则引用时返回 409。调用审计日志按自身保留策略管理；Codex 原生历史不会被此接口清理。
 
 ## 队列、取消与重试
 

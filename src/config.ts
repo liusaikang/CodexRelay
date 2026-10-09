@@ -46,6 +46,7 @@ const codexSchema = z.object({
   sandboxMode: z.string().default('danger-full-access'),
   home: z.string().default('../data/codex-home'),
   defaultWorkingDirectory: z.string().default('../examples/workspace'),
+  developerInstructionsFile: z.string().min(1).optional(),
   defaultModel: z.string().optional(), defaultReasoningEffort: z.string().optional(),
   activeProvider: z.string().default('openai'),
   providers: z.array(providerSchema).min(1).default([{ id: 'openai', label: 'OpenAI / Codex' }]),
@@ -69,6 +70,14 @@ export async function resolveWorkingDirectory(directory: string): Promise<string
     if (!(await stat(canonical)).isDirectory()) throw new Error('Not a directory');
     return canonical;
   } catch { throw new AppError('INVALID_WORKING_DIRECTORY', 'Working directory does not exist or is not accessible.'); }
+}
+
+export async function readDeveloperInstructions(file: string): Promise<string> {
+  const content = (await readFile(file, 'utf8')).trim();
+  if (!content || Buffer.byteLength(content, 'utf8') > 16 * 1024) {
+    throw new AppError('INVALID_DEVELOPER_INSTRUCTIONS', 'Default developer instructions must contain 1 to 16 KiB of text.');
+  }
+  return content;
 }
 
 export async function loadConfig(file: string): Promise<RuntimeConfig> {
@@ -106,6 +115,9 @@ export async function loadConfig(file: string): Promise<RuntimeConfig> {
     throw new Error('server.localConsole requires a loopback-only listener (127.0.0.1 or ::1)');
   }
   const effort = optionalExpanded(config.codex.defaultReasoningEffort);
+  const defaultDeveloperInstructionsFile = config.codex.developerInstructionsFile
+    ? resolve(base, expandEnv(config.codex.developerInstructionsFile)) : undefined;
+  if (defaultDeveloperInstructionsFile) await readDeveloperInstructions(defaultDeveloperInstructionsFile);
   const logDirectory = resolve(base, expandEnv(config.invocationLog.directory));
   const contains = (parent: string, child: string) => { const rel = relative(parent, child); return !rel || (rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel)); };
   if (config.invocationLog.enabled) {
@@ -126,6 +138,7 @@ export async function loadConfig(file: string): Promise<RuntimeConfig> {
     }, ...config.tasks, runner: config.runner,
     dataDir: resolve(base, expandEnv(config.dataDir)), codexHome: resolve(base, expandEnv(config.codex.home)),
     defaultWorkingDirectory: await resolveWorkingDirectory(resolve(base, expandEnv(config.codex.defaultWorkingDirectory))),
+    defaultDeveloperInstructionsFile,
     defaultModel: optionalExpanded(config.codex.defaultModel),
     defaultReasoningEffort: effort ? modelReasoningEffortSchema.parse(effort) : 'high',
     activeProvider, modelProviders: providers,

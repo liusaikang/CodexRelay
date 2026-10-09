@@ -24,6 +24,7 @@ codex:
   sandboxMode: ${CODEX_SANDBOX_MODE:-danger-full-access}
   home: ../data/codex-home
   defaultWorkingDirectory: ../examples/workspace
+  developerInstructionsFile: ./default-developer-instructions.md
   defaultModel: ${CODEX_MODEL:-}
   defaultReasoningEffort: ${CODEX_MODEL_REASONING_EFFORT:-high}
   activeProvider: ${CODEX_PROVIDER:-openai}

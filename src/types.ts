@@ -10,6 +10,7 @@ export const contextSchema = z.record(z.string().min(1).max(128), z.json())
 export const submitSchema = z.object({
   question: z.string().min(1).max(32000).refine(value => value.trim().length > 0, 'Question must not be blank'),
   context: contextSchema.optional(),
+  systemPrompt: z.string().refine(value => Buffer.byteLength(value, 'utf8') <= 16 * 1024, 'System prompt must not exceed 16 KiB').nullable().optional(),
   sandboxMode: sandboxModeSchema.optional(),
   sessionId: idSchema.optional(),
   idempotencyKey: z.string().min(1).max(128).optional(),
@@ -75,6 +76,7 @@ export interface RuntimeConfig {
   maxConcurrent: number; maxQueued: number; runner: 'codex' | 'demo';
   envAllowlist: string[]; codexPath?: string;
   timeoutSeconds: number; queueTimeoutSeconds?: number; defaultWorkingDirectory: string;
+  defaultDeveloperInstructionsFile?: string;
   defaultModel?: string; defaultReasoningEffort?: z.infer<typeof modelReasoningEffortSchema>;
   activeProvider?: string; modelProviders?: ModelProvider[];
 }
@@ -82,6 +84,7 @@ export interface Execution {
   sandboxMode?: z.infer<typeof sandboxModeSchema>;
   taskId: string; question: string; context?: z.infer<typeof contextSchema>; directory: string;
   codexHome: string; threadId?: string; model?: string; modelReasoningEffort?: z.infer<typeof modelReasoningEffortSchema>; codexPath?: string;
+  developerInstructions?: string;
   providerId?: string; providerBaseUrl?: string; providerEnvKey?: string;
   env: Record<string, string>;
 }
@@ -95,6 +98,7 @@ export interface Store {
   open(): Promise<{ tasks: Task[]; sessions: Session[] }>;
   saveTask(task: Task): Promise<void>;
   saveSession(session: Session): Promise<void>;
+  deleteSession(sessionId: string, taskIds: string[]): Promise<void>;
   close(): Promise<void>;
 }
 export class AppError extends Error {

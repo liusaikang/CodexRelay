@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
+import { access, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -46,6 +46,67 @@ async function fixture(maxConcurrent = 2, maxQueued = 2, timeoutSeconds = 30) {
 const input = { question: 'Why is this failing?' };
 
 describe('durable task scheduling', () => {
+  it('deletes a completed session and its tasks durably but rejects active work', async () => {
+    const { service, runner, config, dir } = await fixture();
+    const first = await service.submit({ ...input, idempotencyKey: 'delete-session-first' });
+    await expect(service.deleteSession(first.sessionId)).rejects.toMatchObject({ code: 'SESSION_ACTIVE', httpStatus: 409 });
+    runner.calls[0]!.finish();
+    await until(() => service.getTask(first.taskId).status === 'succeeded');
+    const second = await service.submit({ question: 'Follow-up', sessionId: first.sessionId });
+    await until(() => runner.calls.length === 2);
+    runner.calls[1]!.finish();
+    await until(() => service.getTask(second.taskId).status === 'succeeded');
+    const deleted = await service.deleteSession(first.sessionId);
+    expect(deleted).toEqual({ deleted: true, deletedTasks: 2 });
+    expect(service.listSessions(0,20).total).toBe(0);
+    expect(service.listTasks({status:'all'}).total).toBe(0);
+    await expect(access(join(dir,'sessions',`${first.sessionId}.json`))).rejects.toMatchObject({ code:'ENOENT' });
+    for (const task of [first,second]) await expect(access(join(dir,'tasks',`${task.taskId}.json`))).rejects.toMatchObject({ code:'ENOENT' });
+    await service.close();
+    const restored = new TaskService(config,new FileStore(dir),new ControlledRunner());
+    await restored.init(); cleanup.push(() => restored.close());
+    expect(restored.listSessions(0,20).total).toBe(0);
+    expect(restored.listTasks({status:'all'}).total).toBe(0);
+  });
+  it('selects developer instructions per turn, including queued defaults and resumed sessions', async () => {
+    const { service, runner, config, dir } = await fixture(1, 3);
+    const file = join(dir, 'default-developer-instructions.md');
+    config.defaultDeveloperInstructionsFile = file;
+    await writeFile(file, 'First default');
+    const first = await service.submit(input);
+    await until(() => runner.calls.length === 1);
+    expect(runner.calls[0]!.execution.developerInstructions).toBe('First default');
+    const queued = await service.submit({ ...input, sessionId: first.sessionId, systemPrompt: '  Custom turn  ' });
+    expect(service.getTask(queued.taskId).status).toBe('queued');
+    runner.calls[0]!.finish();
+    await until(() => runner.calls.length === 2);
+    expect(runner.calls[1]!.execution).toMatchObject({ threadId: 'thread-0', developerInstructions: 'Custom turn' });
+    runner.calls[1]!.finish();
+    await until(() => service.getTask(queued.taskId).status === 'succeeded');
+    const waiting = await service.submit(input);
+    await until(() => runner.calls.length === 3);
+    const followUp = await service.submit({ ...input, sessionId: first.sessionId, systemPrompt: '   ' });
+    await writeFile(file, 'Updated default');
+    runner.calls[2]!.finish();
+    await until(() => runner.calls.length === 4);
+    expect(runner.calls[3]!.execution).toMatchObject({ taskId: followUp.taskId, threadId: 'thread-0', developerInstructions: 'Updated default' });
+    expect(service.getTask(waiting.taskId).status).toBe('succeeded');
+  });
+
+  it('keeps an explicit prompt in idempotent submissions and task retries', async () => {
+    const { service, runner } = await fixture(1);
+    const request = { ...input, systemPrompt: 'Custom instruction', idempotencyKey: 'prompt-request' };
+    const original = await service.submit(request);
+    expect((await service.submit(request)).taskId).toBe(original.taskId);
+    await expect(service.submit({ ...request, systemPrompt: 'Different instruction' })).rejects.toMatchObject({ code: 'IDEMPOTENCY_CONFLICT' });
+    await until(() => runner.calls.length === 1);
+    await service.cancel(original.taskId);
+    await until(() => service.getTask(original.taskId).status === 'cancelled');
+    await service.retry(original.taskId, 'retry-prompt');
+    await until(() => runner.calls.length === 2);
+    expect(runner.calls[1]!.execution.developerInstructions).toBe('Custom instruction');
+  });
+
   it('returns a specific safe error when the model credential is missing', async () => {
     const { service, runner } = await fixture(1);
     const submitted = await service.submit(input);

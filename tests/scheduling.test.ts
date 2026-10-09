@@ -179,7 +179,7 @@ it('preserves accepted ordering across restart even if timestamps and file order
   const stored = await store.open(); await store.close();
   for (const task of stored.tasks) task.createdAt = '2026-01-01T00:00:00.000Z';
   stored.tasks.reverse();
-  const memoryStore: Store = { open: async () => stored, saveTask: async () => {}, saveSession: async () => {}, close: async () => {} };
+  const memoryStore: Store = { open: async () => stored, saveTask: async () => {}, saveSession: async () => {}, deleteSession: async () => {}, close: async () => {} };
   const nextRunner = new ControlledRunner(), next = new TaskService(config, memoryStore, nextRunner);
   await next.init(); cleanup.push(() => next.close());
   expect(nextRunner.calls[0]!.id).toBe(second.taskId);
@@ -298,7 +298,7 @@ it('migrates unsequenced timestamp ties without running a queued turn before its
     task.createdAt = new Date().toISOString();
   }
   b.createdAt = a.createdAt;
-  const memoryStore: Store = { open: async () => stored, saveTask: async () => {}, saveSession: async () => {}, close: async () => {} };
+  const memoryStore: Store = { open: async () => stored, saveTask: async () => {}, saveSession: async () => {}, deleteSession: async () => {}, close: async () => {} };
   const runner = new ControlledRunner(), next = new TaskService(config, memoryStore, runner);
   await next.init(); cleanup.push(() => next.close());
   expect(runner.calls).toHaveLength(0);

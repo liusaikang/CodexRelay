@@ -92,6 +92,23 @@ it('accepts native sandbox modes over HTTP and MCP and rejects unknown values', 
   } finally { await client.close(); }
 });
 
+it('accepts optional per-turn system prompts over HTTP and MCP', async () => {
+  const posted = await fetch(`${base}/v1/tasks`, { method: 'POST', headers,
+    body: JSON.stringify({ question: 'Inspect this issue', systemPrompt: 'Cite evidence' }) });
+  expect(posted.status).toBe(202);
+  expect(await posted.json()).toMatchObject({ request: { systemPrompt: 'Cite evidence' } });
+  const empty = await fetch(`${base}/v1/tasks`, { method: 'POST', headers,
+    body: JSON.stringify({ question: 'Inspect another issue', systemPrompt: null }) });
+  expect(empty.status).toBe(202);
+  expect((await empty.json()).request).not.toHaveProperty('systemPrompt');
+  const client = new Client({ name: 'prompt-test', version: '1' });
+  try {
+    await client.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp`), { requestInit: { headers } }));
+    const submitted = await client.callTool({ name: 'codex_submit_task', arguments: { question: 'Inspect via MCP', systemPrompt: 'Report uncertainty' } });
+    expect(submitted.structuredContent).toMatchObject({ data: { request: { systemPrompt: 'Report uncertainty' } } });
+  } finally { await client.close(); }
+});
+
 it('protects task listing and validates retry requests without widening submission fields', async () => {
   expect((await fetch(`${base}/v1/tasks`)).status).toBe(401);
   expect((await fetch(`${base}/assets/queue.js`)).status).toBe(401);
@@ -209,6 +226,26 @@ it('authenticates, validates inputs, rejects browser origins and supports an asy
   expect(final.result.markdown).toContain('未调用 Codex');
 });
 
+it('deletes completed sessions only for an authenticated same-origin console request', async () => {
+  const created = await (await fetch(`${base}/v1/tasks`, { method:'POST', headers,
+    body:JSON.stringify({question:'Remove this conversation'}) })).json();
+  for (let i = 0; i < 100 && ['queued','running'].includes(service.getTask(created.taskId).status); i++) {
+    await new Promise(resolve => setTimeout(resolve,10));
+  }
+  expect(service.getTask(created.taskId).status).toBe('succeeded');
+  const login = await fetch(`${base}/console/login`, { method:'POST', headers:{Origin:base,'Content-Type':'application/json'},
+    body:JSON.stringify({username:'admin',password:'admin'}) });
+  const cookie = login.headers.get('set-cookie')!.split(';')[0]!;
+  const url = `${base}/console/sessions/${created.sessionId}`;
+  expect((await fetch(url,{method:'DELETE',headers})).status).toBe(403);
+  expect((await fetch(url,{method:'DELETE',headers:{Cookie:cookie}})).status).toBe(403);
+  const deleted = await fetch(url,{method:'DELETE',headers:{Cookie:cookie,Origin:base}});
+  expect(deleted.status).toBe(200);
+  expect(await deleted.json()).toEqual({deleted:true,deletedTasks:1});
+  expect((await fetch(`${base}/v1/sessions/${created.sessionId}`,{headers})).status).toBe(404);
+  expect((await fetch(`${base}/v1/tasks/${created.taskId}`,{headers})).status).toBe(404);
+});
+
 it('requires a console login, keeps the service token out of browser responses, and revokes logout', async () => {
   const page = await fetch(`${base}/`, { redirect: 'manual' });
   expect(page.status).toBe(302);
@@ -286,7 +323,7 @@ it('serves discovery, submission, follow-up and errors to the official MCP clien
     const tools = await client.listTools();
     expect(tools.tools).toHaveLength(6);
     const submit = tools.tools.find(tool => tool.name === 'codex_submit_task')!;
-    expect(Object.keys(submit.inputSchema.properties ?? {}).sort()).toEqual(['context', 'idempotencyKey', 'question', 'sandboxMode', 'sessionId']);
+    expect(Object.keys(submit.inputSchema.properties ?? {}).sort()).toEqual(['context', 'idempotencyKey', 'question', 'sandboxMode', 'sessionId', 'systemPrompt']);
     expect(submit.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true, openWorldHint: true });
     expect(tools.tools.map(tool => tool.name)).toContain('codex_get_service_info');
     const first = await client.callTool({ name: 'codex_submit_task', arguments: { question: '为什么看不到数据' } });
