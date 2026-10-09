@@ -50,7 +50,7 @@ MCP 的连接状态不承载业务会话。`codex_get_service_info` 与 `/v1/inf
 
 任务工作目录中的 `AGENTS.md` 放项目说明，`.agents/skills/<名称>/SKILL.md` 放原生 skill。示例路径为 `examples/workspace/AGENTS.md` 和 `examples/workspace/.agents/skills/log-evidence/SKILL.md`。
 
-service 不扫描 skill、不合并文件为 developer instructions，也不根据问题路由 skill。仓库级发现沿 Codex 任务工作目录至仓库根目录，不是任意 service 源目录。上游 MCP 在专用 `codex.home/config.toml` 配置，不再由 YAML 的能力项注入。
+service 的任务执行链路不扫描 skill、不合并文件为 developer instructions，也不根据问题路由 skill；控制台另有只读 Skill 文件查看器。仓库级发现沿 Codex 任务工作目录至仓库根目录，不是任意 service 源目录。上游 MCP 在专用 `codex.home/config.toml` 配置，不再由 YAML 的能力项注入。
 
 ## 调度和存储
 

@@ -34,8 +34,10 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@openai/codex-sdk": "^0.155.1",
+    "dompurify": "^3.4.16",
     "express": "^5.2.1",
     "lucide": "^1.47.0",
+    "marked": "^18.1.0",
     "yaml": "^2.9.1",
     "zod": "^4.6.5"
   },

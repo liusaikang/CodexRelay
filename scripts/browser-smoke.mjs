@@ -6,6 +6,9 @@ const html = await readFile(new URL('../public/index.html', import.meta.url), 'u
 const invocationScript = await readFile(new URL('../public/invocations.js', import.meta.url), 'utf8');
 const settingsScript = await readFile(new URL('../public/settings.js', import.meta.url), 'utf8');
 const schedulesScript = await readFile(new URL('../public/schedules.js', import.meta.url), 'utf8');
+const skillsScript = await readFile(new URL('../public/skills.js', import.meta.url), 'utf8');
+const markedScript = await readFile(new URL('../node_modules/marked/lib/marked.esm.js', import.meta.url), 'utf8');
+const domPurifyScript = await readFile(new URL('../node_modules/dompurify/dist/purify.es.mjs', import.meta.url), 'utf8');
 const icons = await readFile(new URL('../node_modules/lucide/dist/umd/lucide.js', import.meta.url), 'utf8');
 const browser = await chromium.launch({ headless: true, ...(process.env.BROWSER_CHANNEL ? { channel: process.env.BROWSER_CHANNEL } : {}) });
 const errors = [];
@@ -64,6 +67,9 @@ try {
       : route.fulfill({ contentType: 'application/javascript', body: invocationScript });
     if (path === '/assets/settings.js') return route.fulfill({ contentType: 'application/javascript', body: settingsScript });
     if (path === '/assets/schedules.js') return route.fulfill({ contentType: 'application/javascript', body: schedulesScript });
+    if (path === '/assets/skills.js') return route.fulfill({ contentType: 'application/javascript', body: skillsScript });
+    if (path === '/assets/marked.js') return route.fulfill({ contentType: 'application/javascript', body: markedScript });
+    if (path === '/assets/dompurify.js') return route.fulfill({ contentType: 'application/javascript', body: domPurifyScript });
     if (path === '/console/session') return route.fulfill({ json: { username: 'admin' } });
     if (!request.headers().cookie?.includes('codex_console=browser-smoke-session')) {
       errors.push('Missing fixture console session: ' + path);
@@ -98,6 +104,17 @@ try {
         return route.fulfill({ status: 201, json: scheduleRules[0] });
       }
       return route.fulfill({ json: { items: scheduleRules } });
+    }
+    if (path === '/console/skills') return route.fulfill({ json: { workingDirectory: 'D:/workspace/project', root: '.agents/skills', entries: [
+      {name:'sample',path:'sample',kind:'directory',children:[
+        {name:'scripts',path:'sample/scripts',kind:'directory',children:[{name:'audit.py',path:'sample/scripts/audit.py',kind:'file',previewable:true,size:23}]},
+        {name:'SKILL.md',path:'sample/SKILL.md',kind:'file',previewable:true,size:54},
+      ]},
+    ] } });
+    if (path === '/console/skills/file') {
+      const file = new URL(request.url()).searchParams.get('path');
+      return route.fulfill({ json: { path:file,name:file.split('/').at(-1),content:file.endsWith('.py') ? 'print("<img src=x onerror=alert(1)>")' : '# Sample Skill\n**Read** the project evidence.\n<img src=x onerror=alert(1)>',
+        size:54,modifiedAt:'2026-09-24T06:00:00.000Z' } });
     }
     if (path === `/console/schedules/${scheduleId}/runs`) return route.fulfill({ json: { items: scheduledRuns } });
     if (path === `/console/schedules/${scheduleId}/run`) {
@@ -175,6 +192,22 @@ try {
   await expect(page.locator('#schedule-runs-body')).toContainText('等待工作位');
   await page.getByRole('button', { name: '暂停', exact: true }).click();
   await expect(page.locator('#schedule-list')).toContainText('已暂停');
+  await checkLayout(page);
+  await page.getByRole('button', { name: '项目 Skills', exact: true }).click();
+  await expect(page.locator('#skills-workspace')).toHaveText('D:/workspace/project');
+  await expect(page.locator('#skills-file-name')).toHaveText('SKILL.md');
+  await expect(page.locator('#skills-rendered h1')).toHaveText('Sample Skill');
+  await expect(page.locator('#skills-rendered strong')).toHaveText('Read');
+  assert.equal(await page.locator('#skills-rendered img').count(),0);
+  await page.locator('#skills-mode button[data-mode="source"]').click();
+  await expect(page.locator('#skills-content')).toContainText('**Read** the project evidence.');
+  await page.locator('#skills-mode button[data-mode="preview"]').click();
+  await expect(page.locator('#skills-rendered strong')).toHaveText('Read');
+  await page.locator('#skills-tree summary').filter({hasText:'scripts'}).click();
+  await page.locator('#skills-tree button[data-path="sample/scripts/audit.py"]').click();
+  await expect(page.locator('#skills-content')).toContainText('<img src=x onerror=alert(1)>');
+  await expect(page.locator('#skills-mode')).toBeHidden();
+  assert.equal(await page.locator('#skills-content img').count(),0);
   await checkLayout(page);
   await page.getByRole('button', { name: '调用日志', exact: true }).click();
   await expect(page.locator('#logs-total')).toHaveText('21');

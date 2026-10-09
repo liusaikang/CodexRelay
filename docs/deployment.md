@@ -52,7 +52,7 @@ node --env-file=.env dist/main.js --config config/demo.yaml
 
 开发环境默认目录是相对配置文件的 `../examples/workspace`。生产环境由管理员设置 `CODEX_WORKSPACE`；调用方不能通过请求切换工作目录，也不再注册项目名或能力名。
 
-在目标目录准备 `AGENTS.md` 和 `.agents/skills/<名称>/SKILL.md`。示例约定为 `examples/workspace/AGENTS.md` 与 `examples/workspace/.agents/skills/log-evidence/SKILL.md`。技能由 Codex 原生发现，service 不扫描或拼接内容。不要将 skill 仅放到与任务工作目录无关的 service 源目录并期待生效。
+在目标目录准备 `AGENTS.md` 和 `.agents/skills/<名称>/SKILL.md`。示例约定为 `examples/workspace/AGENTS.md` 与 `examples/workspace/.agents/skills/log-evidence/SKILL.md`。技能由 Codex 原生发现；service 执行链路不扫描或拼接内容，控制台只读文件查看器是独立的展示功能。不要将 skill 仅放到与任务工作目录无关的 service 源目录并期待生效。
 
 远端数据源在专用 Codex home 的 `config.toml` 配置；认证变量按需加入 `codex.envAllowlist`。工具和账户权限由部署环境决定，详见 [安全说明](../SECURITY.md)。
 

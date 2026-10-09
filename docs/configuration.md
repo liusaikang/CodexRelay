@@ -134,7 +134,7 @@ description: 分析日志问题时关联源码与请求上下文，输出证据�
 先确认日志时间和请求标识，再关联源码。区分事实、推断与缺失证据。
 ```
 
-网关不读取、扫描、拼接、注册或路由这些 skill。Codex 负责原生发现和使用；不要把 skill 正文重新合并为网关 developer instructions。目录必须是 `.agents`，不是 `.agent`。仓库级发现沿任务工作目录向上到仓库根目录，不会递归发现任意 service 源目录中的 skill。格式与发现规则以 [官方 Build skills](https://learn.chatgpt.com/docs/build-skills) 为准。
+任务执行链路不读取、拼接、注册或路由这些 skill；Codex 负责原生发现和使用。控制台的“项目 Skills”页仅为已登录管理员只读扫描默认工作目录下的 `.agents/skills`，显示文件树和受限文本预览，不参与任务提示词。它不枚举 Codex 专用 home 或其他位置的全部 Skills。不要把 skill 正文重新合并为网关 developer instructions。目录必须是 `.agents`，不是 `.agent`。仓库级发现沿任务工作目录向上到仓库根目录，不会递归发现任意 service 源目录中的 skill。格式与发现规则以 [官方 Build skills](https://learn.chatgpt.com/docs/build-skills) 为准。
 
 原生 skill 不是强制工具调用机制或安全边界；发现或装载成功不等于指定工具必定执行。Codex 本地执行使用配置的沙箱模式，上游 MCP 权限由接入方和部署环境决定，详见 [安全说明](../SECURITY.md)。
 

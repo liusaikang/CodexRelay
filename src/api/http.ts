@@ -9,6 +9,7 @@ import { AppError, idSchema, pageSchema, retrySchema } from '../types.js';
 import type { AccountStatusProvider, CodexLoginProvider } from '../account.js';
 import { invocationQuerySchema } from '../invocations.js';
 import { ScheduleService } from '../schedules.js';
+import { SkillExplorer } from '../skills.js';
 
 export function createHttpApp(service: TaskService, token: string, accountStatus?: AccountStatusProvider, codexLogin?: CodexLoginProvider, schedules?: ScheduleService) {
   if (token.length < 24) throw new Error('Service token must be at least 24 characters');
@@ -22,6 +23,7 @@ export function createHttpApp(service: TaskService, token: string, accountStatus
   const secureCookie = !['127.0.0.1', '::1'].includes(service.config.host);
   const cookieOptions = `Path=/; HttpOnly; SameSite=Strict${secureCookie ? '; Secure' : ''}`;
   const credentials = service.config.consoleAuth;
+  const skillExplorer = new SkillExplorer(service.config.defaultWorkingDirectory);
   const sessionId = (req: express.Request) => req.get('cookie')?.split(';').map(part => part.trim())
     .find(part => part.startsWith(`${cookieName}=`))?.slice(cookieName.length + 1);
   const consoleSession = (req: express.Request) => {
@@ -89,6 +91,18 @@ export function createHttpApp(service: TaskService, token: string, accountStatus
       if (!consoleSession(req)) { res.status(401).end(); return; }
       res.sendFile(fileURLToPath(new URL('../../public/schedules.js', import.meta.url))); return;
     }
+    if (req.method === 'GET' && req.path === '/assets/skills.js') {
+      if (!consoleSession(req)) { res.status(401).end(); return; }
+      res.sendFile(fileURLToPath(new URL('../../public/skills.js', import.meta.url))); return;
+    }
+    if (req.method === 'GET' && req.path === '/assets/marked.js') {
+      if (!consoleSession(req)) { res.status(401).end(); return; }
+      res.type('text/javascript').sendFile(fileURLToPath(new URL('../../node_modules/marked/lib/marked.esm.js', import.meta.url))); return;
+    }
+    if (req.method === 'GET' && req.path === '/assets/dompurify.js') {
+      if (!consoleSession(req)) { res.status(401).end(); return; }
+      res.type('text/javascript').sendFile(fileURLToPath(new URL('../../node_modules/dompurify/dist/purify.es.mjs', import.meta.url))); return;
+    }
     if (req.method === 'GET' && req.path === '/favicon.ico') { res.status(204).end(); return; }
     if (req.path === '/healthz' && req.method === 'GET') {
       const ready = service.health().ready;
@@ -139,6 +153,15 @@ export function createHttpApp(service: TaskService, token: string, accountStatus
   });
   app.get('/console/settings', (_req, res) => res.json(service.getSettings()));
   app.put('/console/settings', async (req, res) => res.json(await service.updateSettings(req.body, consoleSession(req)!.username)));
+  app.use('/console/skills', (req, res, next) => {
+    if (!consoleSession(req)) { res.status(403).json({ error: { code: 'CONSOLE_ONLY', message: 'Console login required' } }); return; }
+    next();
+  });
+  app.get('/console/skills', async (_req, res) => res.json(await skillExplorer.tree()));
+  app.get('/console/skills/file', async (req, res) => {
+    const { path } = z.object({ path: z.string().min(1) }).strict().parse(req.query);
+    res.json(await skillExplorer.file(path));
+  });
   app.use('/console/schedules', (req, res, next) => {
     if (!consoleSession(req)) { res.status(403).json({ error: { code: 'CONSOLE_ONLY', message: 'Console login required' } }); return; }
     if (req.method !== 'GET' && !sameOriginPost(req)) {

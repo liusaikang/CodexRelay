@@ -12,7 +12,7 @@
 
 ## 原生上下文
 
-项目说明位于 `examples/workspace/AGENTS.md`，原生 skill 位于 `examples/workspace/.agents/skills/log-evidence/SKILL.md`。新增 skill 使用服务默认工作目录下的 `.agents/skills`；service 不扫描、拼接、注册或路由 skill。
+项目说明位于 `examples/workspace/AGENTS.md`，原生 skill 位于 `examples/workspace/.agents/skills/log-evidence/SKILL.md`。新增 skill 使用服务默认工作目录下的 `.agents/skills`；service 执行链路不扫描、拼接、注册或路由 skill。控制台只读文件查看器另行扫描此目录，不参与任务执行。
 
 仓库级发现从任务工作目录向上至仓库根目录，不是任意 service 源目录；目录名为 `.agents`，不是 `.agent`。原生 skill 不是强制工具调用机制或安全边界，发现与装载不能证明某个工具实际执行。
 

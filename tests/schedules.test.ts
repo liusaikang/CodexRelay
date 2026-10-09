@@ -100,6 +100,7 @@ it('recovers waiting rounds after a full service restart without replaying inter
   expect(oldTaskIds.every(id => restoredService.getTask(id).status === 'interrupted')).toBe(true);
   expect(restoredSchedules.runs(rule.id)).toHaveLength(5);
   expect(restoredSchedules.runs(rule.id).filter(run => run.state === 'waiting')).toHaveLength(0);
+  await until(() => runner.calls.length === 1);
   expect(runner.calls).toHaveLength(1);
   expect(oldTaskIds).not.toContain(runner.calls[0]!.execution.taskId);
 });
