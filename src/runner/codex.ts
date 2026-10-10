@@ -1,6 +1,7 @@
 import { Codex, type CodexOptions, type ThreadOptions } from '@openai/codex-sdk';
 import { mkdir } from 'node:fs/promises';
 import { AppError, type Execution, type RunEvent, type RunResult } from '../types.js';
+import { classifyCodexFailure } from './diagnostics.js';
 
 export async function runCodex(execution: Execution, signal: AbortSignal, emit: (event: RunEvent) => Promise<void>): Promise<RunResult> {
   await mkdir(execution.codexHome, { recursive: true, mode: 0o700 });
@@ -62,7 +63,8 @@ export async function runCodex(execution: Execution, signal: AbortSignal, emit: 
       complete = true; usage = { ...event.usage };
       await emit({ kind: 'progress', detail: 'turn', state: 'completed' });
     }
-    else if (event.type === 'turn.failed' || event.type === 'error') throw new AppError('CODEX_FAILED', 'Codex returned an execution error.');
+    else if (event.type === 'turn.failed') throw classifyCodexFailure('turn.failed', event.error.message);
+    else if (event.type === 'error') throw classifyCodexFailure('stream.error', event.message);
   }
   if (!complete || !markdown.trim()) throw new AppError('INCOMPLETE_RESPONSE', 'Codex did not produce a completed answer.');
   return { markdown, usage };

@@ -107,6 +107,22 @@ it('rejects a custom provider without its credential before starting Codex', asy
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
+it('keeps the SDK failure category and source without exposing raw event text', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'codex-failure-'));
+  try {
+    sdk.events = [{ type: 'turn.started' }, { type: 'turn.failed', error: { message: '429 quota exceeded for sk-private-token' } }];
+    await expect(runCodex({ taskId: 'failed', question: 'Analyze', directory: dir, codexHome: dir, env: {} },
+      new AbortController().signal, async () => {})).rejects.toMatchObject({
+      code: 'CODEX_RATE_LIMITED', origin: 'turn.failed',
+    });
+    sdk.events = [{ type: 'error', message: 'proxy ECONNRESET with sk-private-token' }];
+    await expect(runCodex({ taskId: 'stream-error', question: 'Analyze', directory: dir, codexHome: dir, env: {} },
+      new AbortController().signal, async () => {})).rejects.toMatchObject({
+      code: 'CODEX_NETWORK_ERROR', origin: 'stream.error',
+    });
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
 it('routes each execution through its pinned provider without changing the shared Codex home', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'codex-provider-'));
   try {

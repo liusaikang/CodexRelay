@@ -15,6 +15,11 @@ process.on('message', async (message) => {
     mode = message.execution.question;
     await send({ type: 'event', event: { kind: 'thread', threadId: 'fixture-thread' } });
     if (mode === 'stubborn') return;
+    if (mode === 'exit') process.exit(7);
+    if (mode === 'diagnostic') {
+      await send({ type: 'error', code: 'CODEX_NETWORK_ERROR', origin: 'stream.error' });
+      process.exit(0);
+    }
     await send({ type: 'result', result: { markdown: 'fixture result', usage: null } });
     process.exit(0);
   }

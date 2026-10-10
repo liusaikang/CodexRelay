@@ -1,6 +1,7 @@
 import { runCodex } from './codex.js';
 import { terminateTree } from './process.js';
 import { AppError, type Execution } from '../types.js';
+import { classifyCodexFailure, CodexDiagnosticError } from './diagnostics.js';
 
 const controller = new AbortController();
 const acknowledgements = new Map<number, () => void>();
@@ -29,7 +30,11 @@ process.on('message', (message: { type: string; id?: number; execution?: Executi
         const result = await runCodex(message.execution!, controller.signal, event => send({ type: 'event', event }));
         await send({ type: 'result', result });
       } catch (error) {
-        await send({ type: 'error', code: error instanceof AppError ? error.code : 'CODEX_EXEC_FAILED' });
+        const diagnostic = error instanceof CodexDiagnosticError ? error
+          : error instanceof AppError ? undefined
+            : classifyCodexFailure('sdk.exception', error instanceof Error ? error.message : '');
+        await send({ type: 'error', code: diagnostic?.code ?? (error as AppError).code,
+          ...(diagnostic ? { origin: diagnostic.origin } : {}) });
       } finally { process.exit(0); }
     })();
   }

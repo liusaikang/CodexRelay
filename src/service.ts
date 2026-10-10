@@ -3,6 +3,7 @@ import { readDeveloperInstructions, resolveWorkingDirectory } from './config.js'
 import { InvocationLog, type InvocationTransport } from './invocations.js';
 import { RuntimeSettingsStore } from './settings.js';
 import { AppError, isTerminal, submitSchema, taskListSchema, retrySchema, type Execution, type Runner, type RuntimeConfig, type Session, type Store, type SubmitInput, type Task } from './types.js';
+import { CodexDiagnosticError } from './runner/diagnostics.js';
 
 const now = () => new Date().toISOString();
 const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -344,9 +345,11 @@ export class TaskService {
           message: task.stopReason ? `Task ${task.stopReason}.`
             : code === 'MODEL_CREDENTIAL_MISSING'
               ? 'Model provider credential is not configured in the service process. Set the provider API key and restart the service.'
+              : error instanceof CodexDiagnosticError ? error.message
               : 'Codex execution failed. Check service diagnostics and model authentication; submit a follow-up when resolved.' };
         // Deliberately omit arbitrary CLI stderr, which can contain credentials or source data.
-        console.error(JSON.stringify({ taskId: task.taskId, code: finished.error.code }));
+        console.error(JSON.stringify({ taskId: task.taskId, code: finished.error.code,
+          ...(error instanceof CodexDiagnosticError ? { origin: error.origin, exitCode: error.exitCode } : {}) }));
         await this.saveTask(finished);
         Object.assign(task, finished);
       });

@@ -16,6 +16,12 @@
 
 排队等待期限包含服务停机时间。已在运行的任务不会因降低并发被直接终止；降低上限只限制后续启动。
 
+## Codex 执行失败
+
+在任务详情查看 `error.code` 和 `error.message`。新任务会按 SDK 返回的信息区分认证失败（`CODEX_AUTH_FAILED`）、限流或额度（`CODEX_RATE_LIMITED`）、网络或代理中断（`CODEX_NETWORK_ERROR`）、上下文超限（`CODEX_CONTEXT_LIMIT`）、模型不可用（`CODEX_MODEL_UNAVAILABLE`）、上游服务错误（`CODEX_UPSTREAM_ERROR`）、SDK/CLI 异常（`CODEX_EXEC_FAILED`）和 Worker 意外退出（`WORKER_EXITED`）。未能安全分类的错误仍为 `CODEX_FAILED`，并显示出错阶段。
+
+诊断只保存错误类别、阶段和 Worker 退出码，不保存原始 SDK 错误文本、CLI stderr、请求内容或凭据。上述分类不能保证还原所有底层故障；部署新版本也无法补全旧任务已经丢失的错误原因。任务发出工具调用后失败时，应先核对外部操作结果，再决定是否重试，避免重复执行。
+
 ## 页面与服务版本不一致
 
 前端更新后，旧服务进程可能仍使用旧的静态资源路由。若 `/assets/queue.js` 等资源返回 404，先确认运行的是新构建及正确工作目录。若返回 401，先重新登录。

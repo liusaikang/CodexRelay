@@ -6,6 +6,7 @@ import { createHash } from 'node:crypto';
 import { FileStore } from '../src/storage.js';
 import { TaskService } from '../src/service.js';
 import { AppError, type Execution, type Runner, type RuntimeConfig } from '../src/types.js';
+import { CodexDiagnosticError } from '../src/runner/diagnostics.js';
 
 const cleanup: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const fn of cleanup.splice(0).reverse()) await fn(); });
@@ -117,6 +118,15 @@ describe('durable task scheduling', () => {
       code: 'MODEL_CREDENTIAL_MISSING',
       message: 'Model provider credential is not configured in the service process. Set the provider API key and restart the service.',
     });
+  });
+  it('shows a safe SDK cause in task details but never stores the raw provider message', async () => {
+    const { service, runner } = await fixture(1);
+    const submitted = await service.submit(input);
+    await until(() => runner.calls.length === 1);
+    runner.calls[0]!.fail(new CodexDiagnosticError('CODEX_NETWORK_ERROR', 'stream.error'));
+    await until(() => service.getTask(submitted.taskId).status === 'failed');
+    expect(service.getTask(submitted.taskId).error).toMatchObject({ code: 'CODEX_NETWORK_ERROR' });
+    expect(service.getTask(submitted.taskId).error?.message).toContain('stream.error');
   });
   it('persists the execution deadline and safe step metadata with running tasks', async () => {
     const { service, runner } = await fixture(1, 2, 5);

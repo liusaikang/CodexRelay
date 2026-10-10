@@ -2,6 +2,7 @@ import { execFile, fork } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { AppError, resultSchema, type Execution, type RunEvent, type Runner, type RunResult } from '../types.js';
+import { CodexDiagnosticError, isCodexDiagnostic } from './diagnostics.js';
 
 export async function terminateTree(pid: number) {
   if (!Number.isInteger(pid) || pid < 1) throw new Error('Invalid worker PID');
@@ -47,21 +48,23 @@ export class ProcessRunner implements Runner {
       child.on('error', () => { failure = new AppError('WORKER_START_FAILED', 'Worker process could not start.'); stop(); });
       child.on('message', (raw: unknown) => {
         handling = handling.then(async () => {
-          const message = raw as { type: string; id: number; event?: RunEvent; result?: unknown; code?: string };
+          const message = raw as { type: string; id: number; event?: RunEvent; result?: unknown; code?: string; origin?: string };
           if (message.type === 'event' && message.event) await onEvent(message.event);
           else if (message.type === 'result') result = resultSchema.parse(message.result);
-          else if (message.type === 'error') failure = new AppError(message.code ?? 'CODEX_FAILED', 'Codex worker failed.');
+          else if (message.type === 'error') failure = message.code && isCodexDiagnostic(message.code, message.origin)
+            ? new CodexDiagnosticError(message.code, message.origin as CodexDiagnosticError['origin'])
+            : new AppError(message.code ?? 'CODEX_FAILED', 'Codex worker failed.');
           send({ type: 'ack', id: message.id });
         }).catch(() => { failure = new AppError('WORKER_EVENT_FAILED', 'Unable to persist worker event.'); stop(); });
       });
-      child.on('close', () => {
+      child.on('close', (exitCode) => {
         closed = true;
         clearTimeout(forceTimer);
         signal.removeEventListener('abort', stop);
         void handling.then(() => {
           if (signal.aborted) reject(new AppError('CANCELLED', 'Execution cancelled'));
           else if (failure) reject(failure);
-          else if (!result) reject(new AppError('WORKER_EXITED', 'Worker exited without a result.'));
+          else if (!result) reject(new CodexDiagnosticError('WORKER_EXITED', 'worker.exit', exitCode ?? undefined));
           else resolve(result);
         });
       });

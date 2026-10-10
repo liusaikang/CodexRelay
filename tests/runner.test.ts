@@ -21,3 +21,13 @@ it('forcibly stops an unresponsive worker on cancellation and only then rejects'
   await expect(promise).rejects.toMatchObject({ code: 'CANCELLED' });
   expect(Date.now() - start).toBeGreaterThan(2900);
 }, 15000);
+it('passes a safe SDK diagnostic from the worker to the parent', async () => {
+  const runner = new ProcessRunner(resolve('tests/fixtures/worker.cjs'));
+  await expect(runner.run(execution('diagnostic'), new AbortController().signal, async () => {}))
+    .rejects.toMatchObject({ code: 'CODEX_NETWORK_ERROR', origin: 'stream.error' });
+});
+it('reports an unexpected worker exit code instead of an opaque failure', async () => {
+  const runner = new ProcessRunner(resolve('tests/fixtures/worker.cjs'));
+  await expect(runner.run(execution('exit'), new AbortController().signal, async () => {}))
+    .rejects.toMatchObject({ code: 'WORKER_EXITED', origin: 'worker.exit', exitCode: 7 });
+});
