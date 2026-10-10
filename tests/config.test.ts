@@ -43,6 +43,7 @@ it('loads the development environment with its existing history and invocation l
   expect(config.dataDir).toBe(resolve('data/native-logs-preview'));
   expect(config.codexHome).toBe(resolve('data/codex-home'));
   expect(config.invocationLog).toMatchObject({ enabled: true, directory: resolve('data/invocation-logs'), retentionDays: 30 });
+  expect(config.sdkEventLog).toEqual({ enabled: true, retentionDays: 14, maxBytesPerTask: 16 * 1024 * 1024 });
   expect(config.queueTimeoutSeconds).toBe(1800);
   expect(config.consoleAuth).toEqual({ username: 'admin', password: 'admin' });
   expect(config.maxConcurrent).toBe(parse(await readFile('config/development.yaml', 'utf8')).tasks.maxConcurrent);

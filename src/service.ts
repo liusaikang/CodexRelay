@@ -301,6 +301,7 @@ export class TaskService {
     return { taskId: task.taskId, question: task.request.question, context: task.request.context, directory: session.workingDirectory!,
       codexHome: this.config.codexHome, model: session.model, modelReasoningEffort: session.modelReasoningEffort, threadId: session.threadId,
       providerId, providerBaseUrl: provider.baseUrl, providerEnvKey: provider.envKey,
+      sdkEventLog: this.config.sdkEventLog && { enabled: this.config.sdkEventLog.enabled, maxBytesPerTask: this.config.sdkEventLog.maxBytesPerTask },
       developerInstructions, env, codexPath: this.config.codexPath, sandboxMode: task.sandboxMode ?? task.request.sandboxMode ?? 'danger-full-access' };
   }
   private async execute(task: Task, controller: AbortController) {

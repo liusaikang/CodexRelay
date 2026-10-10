@@ -70,6 +70,7 @@ export interface ModelProvider {
 export interface RuntimeConfig {
   sandboxMode?: z.infer<typeof sandboxModeSchema>;
   invocationLog?: { enabled: boolean; directory: string; retentionDays: number };
+  sdkEventLog?: { enabled: boolean; retentionDays: number; maxBytesPerTask: number };
   dataDir: string; codexHome: string; host: string; port: number;
   tokenEnv: string; localConsole?: boolean; allowedHosts: string[]; allowedOrigins: string[];
   consoleAuth?: { username: string; password: string };
@@ -86,6 +87,7 @@ export interface Execution {
   codexHome: string; threadId?: string; model?: string; modelReasoningEffort?: z.infer<typeof modelReasoningEffortSchema>; codexPath?: string;
   developerInstructions?: string;
   providerId?: string; providerBaseUrl?: string; providerEnvKey?: string;
+  sdkEventLog?: { enabled: boolean; maxBytesPerTask: number };
   env: Record<string, string>;
 }
 export type RunEvent = { kind: 'thread'; threadId: string }

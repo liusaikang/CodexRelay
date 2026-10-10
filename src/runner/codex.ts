@@ -2,9 +2,40 @@ import { Codex, type CodexOptions, type ThreadOptions } from '@openai/codex-sdk'
 import { mkdir } from 'node:fs/promises';
 import { AppError, type Execution, type RunEvent, type RunResult } from '../types.js';
 import { classifyCodexFailure } from './diagnostics.js';
+import { SdkEventLog } from './sdk-events.js';
 
 export async function runCodex(execution: Execution, signal: AbortSignal, emit: (event: RunEvent) => Promise<void>): Promise<RunResult> {
   await mkdir(execution.codexHome, { recursive: true, mode: 0o700 });
+  let eventLog: SdkEventLog | undefined;
+  if (execution.sdkEventLog?.enabled) {
+    try { eventLog = await SdkEventLog.open(execution.codexHome, execution.taskId, execution.sdkEventLog.maxBytesPerTask); }
+    catch { await emit({ kind: 'progress', detail: 'sdk_event_log_unavailable' }); }
+  }
+  const record = async (entry: Parameters<SdkEventLog['append']>[0]) => {
+    if (!eventLog) return;
+    try { await eventLog.append(entry); }
+    catch {
+      const failed = eventLog;
+      eventLog = undefined;
+      await failed.close().catch(() => {});
+      await emit({ kind: 'progress', detail: 'sdk_event_log_unavailable' });
+    }
+  };
+  try {
+    return await executeCodex(execution, signal, emit, record);
+  } catch (error) {
+    await record({ source: 'runner', error: {
+      ...(error instanceof AppError ? { code: error.code } : {}),
+      message: error instanceof Error ? error.message : String(error),
+    } });
+    throw error;
+  } finally {
+    if (eventLog) await eventLog.close().catch(() => emit({ kind: 'progress', detail: 'sdk_event_log_unavailable' }));
+  }
+}
+
+async function executeCodex(execution: Execution, signal: AbortSignal, emit: (event: RunEvent) => Promise<void>,
+  record: (entry: Parameters<SdkEventLog['append']>[0]) => Promise<void>): Promise<RunResult> {
   const nativeConfig: NonNullable<CodexOptions['config']> = { shell_environment_policy: { inherit: 'core' } };
   if (execution.developerInstructions) nativeConfig.developer_instructions = execution.developerInstructions;
   if (execution.providerId) nativeConfig.model_provider = execution.providerId;
@@ -41,6 +72,7 @@ export async function runCodex(execution: Execution, signal: AbortSignal, emit: 
   let eventCount = 0;
   const started = new Map<string, number>();
   for await (const event of events) {
+    await record({ source: 'sdk', event });
     if (++eventCount > 10000) throw new AppError('EVENT_LIMIT', 'Execution exceeded the event limit.');
     if (event.type === 'thread.started') await emit({ kind: 'thread', threadId: event.thread_id });
     else if (event.type === 'turn.started') await emit({ kind: 'progress', detail: 'turn', state: 'started' });

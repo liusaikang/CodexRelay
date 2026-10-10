@@ -92,6 +92,19 @@ invocationLog:
 
 日志写入失败不会把成功任务改成失败，控制台通过 `healthy: false` 标记记录可能不完整，修复目录并重启后从核心任务恢复尚在保留期的已标记记录。单实例文件存储会加载保留期内的记录到内存，保留天数应结合调用量配置；不支持多个实例共用日志目录。
 
+## SDK 事件诊断日志
+
+```yaml
+sdkEventLog:
+  enabled: true
+  retentionDays: 14
+  maxBytesPerTask: 16777216
+```
+
+Codex Worker 会把每个任务收到的原始 SDK 事件和适配器最终异常按 JSONL 写入 `codex.home/sdk-events/task_<uuid>.jsonl`。包括 `item.updated`、`item.completed` 中的原始错误消息；与只保留事件类型的任务 `progress` 不同。单文件达到 `maxBytesPerTask` 后写入截断标记并停止记录，任务继续执行。启动时及之后每天清理超过 `retentionDays` 的诊断文件。`enabled`、保留期和容量是 YAML 配置，需要重启才能生效；关闭后不追溯清理旧文件。旧任务的丢失事件无法补录。
+
+**原始事件可能包含问题、模型回答、执行命令、工具输出和敏感业务数据。** 诊断文件不通过 HTTP/MCP 或控制台返回，也不应提交仓库或发送给第三方。`data/` 默认被 Git 忽略；自定义 `codex.home` 必须位于非公开目录并限制运行账号访问。Unix 新目录/文件分别使用 `0700`/`0600`；Windows 需检查目录继承的 ACL。日志不可写时任务照常执行，`progress` 会出现 `sdk_event_log_unavailable`，但这次任务的详细诊断可能缺失。
+
 ## 请求与默认值
 
 新会话始终使用 `codex.defaultWorkingDirectory`、当前全局供应商及模型/推理强度。默认工作目录必须存在并且运行账户可访问。供应商档案在 YAML 中定义，`openai` 使用 Codex 内置请求地址和认证；自定义供应商需要 HTTPS `baseUrl`、已加入 `codex.envAllowlist` 的 `envKey`，并使用 Codex Responses API。密钥只放在进程环境中。

@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -120,6 +120,28 @@ it('keeps the SDK failure category and source without exposing raw event text', 
       new AbortController().signal, async () => {})).rejects.toMatchObject({
       code: 'CODEX_NETWORK_ERROR', origin: 'stream.error',
     });
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+it('records SDK error items and fatal stream errors in a private per-task journal', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'codex-sdk-events-'));
+  const taskId = 'task_11111111-1111-4111-8111-111111111111';
+  try {
+    sdk.events = [
+      { type: 'item.completed', item: { id: 'error-1', type: 'error', message: 'Connection retry after ECONNRESET' } },
+      { type: 'turn.started' },
+      { type: 'error', message: 'proxy ECONNRESET after retry' },
+    ];
+    const emitted: unknown[] = [];
+    await expect(runCodex({ taskId, question: 'What failed?', directory: dir, codexHome: dir, env: {},
+      sdkEventLog: { enabled: true, maxBytesPerTask: 1024 * 1024 } },
+    new AbortController().signal, async event => { emitted.push(event); })).rejects.toMatchObject({ code: 'CODEX_NETWORK_ERROR' });
+    const rows = (await readFile(join(dir, 'sdk-events', `${taskId}.jsonl`), 'utf8')).trim().split('\n').map(line => JSON.parse(line));
+    expect(rows.map(row => row.event?.type)).toEqual(['item.completed', 'turn.started', 'error', undefined]);
+    expect(rows[0].event.item.message).toBe('Connection retry after ECONNRESET');
+    expect(rows[2].event.message).toBe('proxy ECONNRESET after retry');
+    expect(rows[3]).toMatchObject({ source: 'runner', error: { code: 'CODEX_NETWORK_ERROR' } });
+    expect(JSON.stringify(emitted)).not.toContain('ECONNRESET');
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 

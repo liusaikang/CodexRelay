@@ -20,7 +20,7 @@
 
 在任务详情查看 `error.code` 和 `error.message`。新任务会按 SDK 返回的信息区分认证失败（`CODEX_AUTH_FAILED`）、限流或额度（`CODEX_RATE_LIMITED`）、网络或代理中断（`CODEX_NETWORK_ERROR`）、上下文超限（`CODEX_CONTEXT_LIMIT`）、模型不可用（`CODEX_MODEL_UNAVAILABLE`）、上游服务错误（`CODEX_UPSTREAM_ERROR`）、SDK/CLI 异常（`CODEX_EXEC_FAILED`）和 Worker 意外退出（`WORKER_EXITED`）。未能安全分类的错误仍为 `CODEX_FAILED`，并显示出错阶段。
 
-诊断只保存错误类别、阶段和 Worker 退出码，不保存原始 SDK 错误文本、CLI stderr、请求内容或凭据。上述分类不能保证还原所有底层故障；部署新版本也无法补全旧任务已经丢失的错误原因。任务发出工具调用后失败时，应先核对外部操作结果，再决定是否重试，避免重复执行。
+任务 API 和控制台只展示错误类别、阶段和 Worker 退出码，不展示原始 SDK 文本。启用 `sdkEventLog` 时，在服务端 `codex.home/sdk-events/task_<uuid>.jsonl` 按时间读取该任务的原始 SDK 事件；先找 `item.completed` 的 `error` 条目，再看 `turn.failed` 或顶层 `error` 事件。原始日志可能含有敏感内容，查看或分享前必须脱敏。文件达到上限会标记 `diagnostic.truncated`；写入失败时任务进度会出现 `sdk_event_log_unavailable`。新版本无法补全旧任务已经丢失的事件。任务发出工具调用后失败时，应先核对外部操作结果，再决定是否重试，避免重复执行。
 
 ## 页面与服务版本不一致
 

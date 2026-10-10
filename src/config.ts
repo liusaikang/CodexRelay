@@ -54,6 +54,11 @@ const codexSchema = z.object({
   envAllowlist: z.array(z.string()).default(['CODEX_API_KEY', 'DASHSCOPE_API_KEY', 'HTTPS_PROXY', 'HTTP_PROXY', 'NO_PROXY']),
 }).strict();
 const configSchema = z.object({
+  sdkEventLog: z.object({
+    enabled: z.boolean().default(true),
+    retentionDays: z.number().int().min(1).max(365).default(14),
+    maxBytesPerTask: z.number().int().min(1024 * 1024).max(256 * 1024 * 1024).default(16 * 1024 * 1024),
+  }).strict().prefault({}),
   invocationLog: z.object({
     enabled: z.boolean().default(false), directory: z.string().min(1).default('../data/invocation-logs'),
     retentionDays: z.number().int().min(1).max(3650).default(30),
@@ -131,6 +136,7 @@ export async function loadConfig(file: string): Promise<RuntimeConfig> {
   }
   return {
     sandboxMode: sandboxModeSchema.parse(expandEnv(config.codex.sandboxMode)),
+    sdkEventLog: config.sdkEventLog,
     invocationLog: { ...config.invocationLog, directory: logDirectory },
     ...config.server, host, allowedHosts, allowedOrigins, consoleAuth: config.server.consoleAuth && {
       username: expandEnv(config.server.consoleAuth.username),

@@ -1,5 +1,9 @@
 # Local development. Keep this directory to preserve existing sessions and logs.
 dataDir: ../data/native-logs-preview
+sdkEventLog:
+  enabled: true
+  retentionDays: 14
+  maxBytesPerTask: 16777216
 invocationLog:
   enabled: true
   directory: ../data/invocation-logs

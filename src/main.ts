@@ -7,6 +7,7 @@ import { FileStore, inspectStoreLock, recoverStoreLock } from './storage.js';
 import { TaskService } from './service.js';
 import { ScheduleService } from './schedules.js';
 import { ProcessRunner } from './runner/process.js';
+import { pruneSdkEventLogs } from './runner/sdk-events.js';
 import { DemoRunner } from './runner/demo.js';
 import { createHttpApp } from './api/http.js';
 import { createMcpServer } from './api/mcp.js';
@@ -33,7 +34,8 @@ async function main() {
   if (values.check) {
     const provider = config.modelProviders?.find(item => item.id === (config.activeProvider ?? 'openai'));
     console.log(JSON.stringify({ valid: true, configFile: resolve(values.config!), dataDir: config.dataDir,
-      invocationLog: config.invocationLog?.enabled === true, runner: config.runner, maxConcurrent: config.maxConcurrent, maxQueued: config.maxQueued,
+      invocationLog: config.invocationLog?.enabled === true, sdkEventLog: config.sdkEventLog, runner: config.runner,
+      maxConcurrent: config.maxConcurrent, maxQueued: config.maxQueued,
       queueTimeoutSeconds: config.queueTimeoutSeconds, timeoutSeconds: config.timeoutSeconds, sandboxMode: config.sandboxMode,
       defaultWorkingDirectory: config.defaultWorkingDirectory, localConsole: !!config.localConsole, activeProvider: config.activeProvider ?? 'openai',
       modelAuthentication: provider?.envKey ? process.env[provider.envKey] ? 'external-api-key-present-not-validated' : 'not-detected'
@@ -47,12 +49,21 @@ async function main() {
   const accountStatus = accountGateway ? new AccountInspector(accountGateway) : undefined;
   const codexLogin = accountGateway ? new CodexLoginManager(accountGateway, accountStatus) : undefined;
   await service.init();
+  let sdkEventPruneTimer: NodeJS.Timeout | undefined;
+  if (config.runner === 'codex' && config.sdkEventLog?.enabled) {
+    const prune = () => pruneSdkEventLogs(config.codexHome, config.sdkEventLog!.retentionDays)
+      .catch(() => console.error('SDK event log retention cleanup failed; inspect log storage.'));
+    await prune();
+    sdkEventPruneTimer = setInterval(() => { void prune(); }, 86_400_000);
+    sdkEventPruneTimer.unref();
+  }
   const schedules = values.transport === 'http' ? new ScheduleService(service) : undefined;
   let closeTransport: () => Promise<void> = async () => {};
   let stopping = false;
   const shutdown = async () => {
     if (stopping) return;
     stopping = true;
+    clearInterval(sdkEventPruneTimer);
     // Stop admission before closing listeners; retain queued tasks for next startup.
     await schedules?.close();
     await service.close();

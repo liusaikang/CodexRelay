@@ -1,5 +1,9 @@
 # Production paths and credentials are supplied by the deployment environment.
 dataDir: ${CODEX_DATA_DIR}
+sdkEventLog:
+  enabled: true
+  retentionDays: 14
+  maxBytesPerTask: 16777216
 invocationLog:
   enabled: true
   directory: ${CODEX_INVOCATION_LOG_DIR}
